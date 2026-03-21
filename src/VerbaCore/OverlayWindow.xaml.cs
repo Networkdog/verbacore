@@ -1,7 +1,11 @@
 using System.Text;
 using System.Windows;
+using System.Windows.Documents;
+using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
+using Markdig;
+using Markdig.Wpf;
 using VerbaCore.Models;
 using VerbaCore.Services;
 
@@ -26,6 +30,10 @@ public partial class OverlayWindow : Window
     private bool _persistentMode;
     /// <summary>Whether the overlay is currently visible.</summary>
     private bool _isShown;
+
+    private static readonly MarkdownPipeline MarkdownPipeline = new MarkdownPipelineBuilder()
+        .UseSupportedExtensions()
+        .Build();
 
     public OverlayWindow(
         IOpenAiService openAiService,
@@ -62,22 +70,6 @@ public partial class OverlayWindow : Window
 
         // Handle Tab key for mode switching (in the keyboard hook)
         PreviewKeyDown += (_, e) => e.Handled = true;
-
-        // Click outside the overlay content to close
-        MouseDown += OnOverlayMouseDown;
-    }
-
-    private void OnOverlayMouseDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
-    {
-        if (_isShown)
-        {
-            HideOverlay();
-        }
-    }
-
-    private void ContentBorder_MouseDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
-    {
-        e.Handled = true;
     }
 
     private void OnCapsLockPressed(object? sender, EventArgs e)
@@ -94,8 +86,8 @@ public partial class OverlayWindow : Window
 
             // Reset UI for new input
             InputDisplay.Text = "";
-            ResultDisplay.Text = "";
-            ResultScroller.Visibility = Visibility.Collapsed;
+            ResultViewer.Document = new FlowDocument();
+            ResultViewer.Visibility = Visibility.Collapsed;
             LoadingPanel.Visibility = Visibility.Collapsed;
             BlinkingCursor.Visibility = Visibility.Visible;
             HintLabel.Visibility = Visibility.Visible;
@@ -141,8 +133,8 @@ public partial class OverlayWindow : Window
                 if (!_isShown)
                 {
                     InputDisplay.Text = "";
-                    ResultDisplay.Text = "";
-                    ResultScroller.Visibility = Visibility.Collapsed;
+                    ResultViewer.Document = new FlowDocument();
+                    ResultViewer.Visibility = Visibility.Collapsed;
                     LoadingPanel.Visibility = Visibility.Collapsed;
                     HintLabel.Visibility = Visibility.Visible;
                     UpdateModeLabel();
@@ -267,8 +259,8 @@ public partial class OverlayWindow : Window
             {
                 sb.Append(chunk);
                 LoadingPanel.Visibility = Visibility.Collapsed;
-                ResultScroller.Visibility = Visibility.Visible;
-                ResultDisplay.Text = sb.ToString();
+                ResultViewer.Visibility = Visibility.Visible;
+                RenderMarkdown(sb.ToString());
             }
 
             StatusLabel.Text = "완료 — 아무 키를 누르면 닫힙니다";
@@ -293,8 +285,8 @@ public partial class OverlayWindow : Window
         catch (Exception ex)
         {
             LoadingPanel.Visibility = Visibility.Collapsed;
-            ResultScroller.Visibility = Visibility.Visible;
-            ResultDisplay.Text = $"오류: {ex.Message}\n\nAPI Key와 네트워크를 확인해주세요.";
+            ResultViewer.Visibility = Visibility.Visible;
+            RenderMarkdown($"오류: {ex.Message}\n\nAPI Key와 네트워크를 확인해주세요.");
             StatusLabel.Text = "오류 발생";
             _autoHideTimer.Start();
         }
@@ -302,8 +294,13 @@ public partial class OverlayWindow : Window
 
     private void ShowOverlay()
     {
+        // Size to screen
+        var screen = SystemParameters.PrimaryScreenWidth;
+        Width = Math.Min(700, screen * 0.5);
+        Left = (screen - Width) / 2;
+        Top = SystemParameters.PrimaryScreenHeight * 0.25;
+
         _isShown = true;
-        WindowState = System.Windows.WindowState.Maximized;
         Show();
 
         var fadeIn = new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(120));
@@ -319,11 +316,7 @@ public partial class OverlayWindow : Window
         _capsLockService.PersistentModeActive = false;
 
         var fadeOut = new DoubleAnimation(1, 0, TimeSpan.FromMilliseconds(150));
-        fadeOut.Completed += (_, _) =>
-        {
-            Hide();
-            WindowState = System.Windows.WindowState.Normal;
-        };
+        fadeOut.Completed += (_, _) => Hide();
         RootGrid.BeginAnimation(OpacityProperty, fadeOut);
     }
 
@@ -338,4 +331,30 @@ public partial class OverlayWindow : Window
         "German" => "DE",
         _ => lang[..2].ToUpperInvariant()
     };
+
+    private void RenderMarkdown(string markdown)
+    {
+        try
+        {
+            var doc = Markdig.Wpf.Markdown.ToFlowDocument(markdown, MarkdownPipeline);
+            // Style the document for dark overlay
+            doc.Foreground = new SolidColorBrush(Color.FromArgb(0xE0, 0xFF, 0xFF, 0xFF));
+            doc.FontSize = 14;
+            doc.FontFamily = new FontFamily("Segoe UI");
+            doc.PagePadding = new Thickness(0);
+            ResultViewer.Document = doc;
+        }
+        catch
+        {
+            // Fallback to plain text if markdown parsing fails
+            var doc = new FlowDocument(new Paragraph(new Run(markdown)))
+            {
+                Foreground = new SolidColorBrush(Color.FromArgb(0xE0, 0xFF, 0xFF, 0xFF)),
+                FontSize = 14,
+                FontFamily = new FontFamily("Segoe UI"),
+                PagePadding = new Thickness(0)
+            };
+            ResultViewer.Document = doc;
+        }
+    }
 }

@@ -8,20 +8,15 @@
         Topmost="True"
         ShowInTaskbar="False"
         WindowStartupLocation="CenterScreen"
+        Width="700" Height="400"
         ResizeMode="NoResize"
         Focusable="False">
 
-    <Grid x:Name="RootGrid" Opacity="0"
-          Background="Transparent">
+    <Grid x:Name="RootGrid" Opacity="0">
         <!-- Semi-transparent backdrop -->
         <Border Background="#CC1A1A2E"
                 CornerRadius="16"
-                Margin="20"
-                MouseDown="ContentBorder_MouseDown"
-                MaxWidth="660"
-                MaxHeight="400"
-                HorizontalAlignment="Center"
-                VerticalAlignment="Center">
+                Margin="20">
             <Border.Effect>
                 <DropShadowEffect BlurRadius="30" ShadowDepth="0" Opacity="0.5" Color="Black" />
             </Border.Effect>
@@ -78,19 +73,17 @@
                         Opacity="0.8" />
 
                 <!-- Result area (appears after CapsLock release) -->
-                <ScrollViewer Grid.Row="2"
-                              x:Name="ResultScroller"
+                <FlowDocumentScrollViewer Grid.Row="2"
+                              x:Name="ResultViewer"
                               VerticalScrollBarVisibility="Auto"
                               HorizontalScrollBarVisibility="Disabled"
                               Visibility="Collapsed"
-                              Margin="0,8,0,0">
-                    <TextBlock x:Name="ResultDisplay"
-                               Text=""
-                               FontSize="14"
-                               LineHeight="22"
-                               Foreground="#E0FFFFFF"
-                               TextWrapping="Wrap" />
-                </ScrollViewer>
+                              Margin="0,8,0,0"
+                              Background="Transparent"
+                              Foreground="#E0FFFFFF"
+                              FontSize="14"
+                              FontFamily="Segoe UI"
+                              IsToolBarVisible="False" />
 
                 <!-- Loading indicator -->
                 <StackPanel Grid.Row="2"

@@ -79,14 +79,15 @@ public partial class App : Application
             _clipboardService = GetService<ClipboardMonitorService>();
             var clipboardHelper = new Window
             {
-                Width = 0, Height = 0,
+                Width = 1, Height = 1,
                 WindowStyle = System.Windows.WindowStyle.None,
+                AllowsTransparency = true,
+                Opacity = 0,
                 ShowInTaskbar = false,
                 ShowActivated = false
             };
             clipboardHelper.Show();
             _clipboardService.Start(clipboardHelper);
-            clipboardHelper.Hide();
             _clipboardService.ClipboardTextChanged += OnClipboardTextChanged;
         }
     }

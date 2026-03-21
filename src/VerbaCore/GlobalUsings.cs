@@ -8,3 +8,5 @@ global using KeyEventArgs = System.Windows.Input.KeyEventArgs;
 global using Clipboard = System.Windows.Clipboard;
 global using Point = System.Windows.Point;
 global using Size = System.Windows.Size;
+global using Color = System.Windows.Media.Color;
+global using FontFamily = System.Windows.Media.FontFamily;
