@@ -1,0 +1,111 @@
+<UserControl x:Class="VerbaCore.Views.HistoryView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+             xmlns:vm="clr-namespace:VerbaCore.ViewModels"
+             d:DataContext="{d:DesignInstance vm:HistoryViewModel}"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             Background="Transparent">
+
+    <Grid Margin="16,8,16,16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Search & Clear -->
+        <Grid Grid.Row="0" Margin="0,0,0,12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <ui:TextBox Grid.Column="0"
+                        PlaceholderText="히스토리 검색..."
+                        Text="{Binding SearchFilter, UpdateSourceTrigger=PropertyChanged}"
+                        Margin="0,0,8,0" />
+            <ui:Button Grid.Column="1"
+                       Content="전체 삭제"
+                       Appearance="Danger"
+                       Command="{Binding ClearHistoryCommand}" />
+        </Grid>
+
+        <!-- History List -->
+        <ListBox Grid.Row="1"
+                 ItemsSource="{Binding HistoryItems}"
+                 Background="Transparent"
+                 BorderThickness="0"
+                 ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+            <ListBox.ItemTemplate>
+                <DataTemplate>
+                    <ui:Card Margin="0,0,0,4" Padding="12">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <!-- Input & Mode -->
+                            <Grid Grid.Row="0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0"
+                                           Text="{Binding Input}"
+                                           FontWeight="SemiBold"
+                                           FontSize="13"
+                                           TextTrimming="CharacterEllipsis" />
+                                <TextBlock Grid.Column="1"
+                                           Text="{Binding Mode}"
+                                           FontSize="11"
+                                           Opacity="0.5"
+                                           Margin="8,0,0,0" />
+                            </Grid>
+
+                            <!-- Response preview -->
+                            <TextBlock Grid.Row="1"
+                                       Text="{Binding Response}"
+                                       FontSize="11"
+                                       Opacity="0.7"
+                                       MaxHeight="40"
+                                       TextTrimming="CharacterEllipsis"
+                                       TextWrapping="Wrap"
+                                       Margin="0,4,0,4" />
+
+                            <!-- Timestamp & Re-query -->
+                            <Grid Grid.Row="2">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0"
+                                           Text="{Binding Timestamp, StringFormat='{}{0:yyyy-MM-dd HH:mm}'}"
+                                           FontSize="10"
+                                           Opacity="0.4" />
+                                <ui:Button Grid.Column="1"
+                                           Content="다시 조회"
+                                           FontSize="11"
+                                           Padding="8,2"
+                                           Command="{Binding DataContext.RequeryCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
+                                           CommandParameter="{Binding}" />
+                            </Grid>
+                        </Grid>
+                    </ui:Card>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
+
+        <!-- Empty state -->
+        <TextBlock Grid.Row="1"
+                   Text="조회 기록이 없습니다"
+                   HorizontalAlignment="Center"
+                   VerticalAlignment="Center"
+                   Opacity="0.4"
+                   FontSize="14"
+                   Visibility="{Binding HistoryItems.Count, Converter={StaticResource ZeroToVisibilityConverter}}" />
+    </Grid>
+</UserControl>

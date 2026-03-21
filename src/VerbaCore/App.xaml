@@ -1,0 +1,23 @@
+﻿<Application x:Class="VerbaCore.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+             xmlns:helpers="clr-namespace:VerbaCore.Helpers"
+             ShutdownMode="OnExplicitShutdown"
+             DispatcherUnhandledException="OnDispatcherUnhandledException">
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ui:ThemesDictionary Theme="Dark" />
+                <ui:ControlsDictionary />
+            </ResourceDictionary.MergedDictionaries>
+
+            <!-- Converters -->
+            <helpers:ModeToAppearanceConverter x:Key="ModeToAppearanceConverter" />
+            <helpers:InverseBoolConverter x:Key="InverseBoolConverter" />
+            <helpers:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
+            <helpers:ZeroToVisibilityConverter x:Key="ZeroToVisibilityConverter" />
+            <helpers:BoolToAzureKeyPlaceholderConverter x:Key="BoolToAzureKeyPlaceholderConverter" />
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

@@ -1,0 +1,46 @@
+<ui:FluentWindow x:Class="VerbaCore.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+        xmlns:views="clr-namespace:VerbaCore.Views"
+        Title="VerbaCore 설정"
+        Width="480" Height="620"
+        MinWidth="400" MinHeight="500"
+        WindowStartupLocation="CenterScreen"
+        ExtendsContentIntoTitleBar="True"
+        WindowBackdropType="Mica"
+        WindowCornerPreference="Round"
+        ResizeMode="CanMinimize">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <ui:TitleBar Grid.Row="0"
+                     Title="VerbaCore 설정"
+                     ShowMinimize="False"
+                     ShowMaximize="False"
+                     ShowClose="True" />
+
+        <TabControl Grid.Row="1"
+                    Background="Transparent"
+                    BorderThickness="0"
+                    Padding="0">
+            <TabControl.Resources>
+                <Style TargetType="TabItem" BasedOn="{StaticResource {x:Type TabItem}}">
+                    <Setter Property="Padding" Value="16,8" />
+                </Style>
+            </TabControl.Resources>
+
+            <TabItem Header="⚙ 설정">
+                <views:SettingsView x:Name="SettingsViewPage" />
+            </TabItem>
+
+            <TabItem Header="📋 히스토리">
+                <views:HistoryView x:Name="HistoryViewPage" />
+            </TabItem>
+        </TabControl>
+    </Grid>
+</ui:FluentWindow>
