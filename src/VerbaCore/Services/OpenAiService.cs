@@ -36,7 +36,7 @@ public sealed class OpenAiService : IOpenAiService
         if (s.Provider == ApiProvider.AzureOpenAI)
         {
             var endpoint = s.AzureEndpoint.TrimEnd('/');
-            return $"{endpoint}/openai/deployments/{s.AzureDeploymentName}/chat/completions?api-version={s.AzureApiVersion}";
+            return $"{endpoint}/openai/deployments/{s.Model}/chat/completions?api-version={s.AzureApiVersion}";
         }
         return OpenAiApiUrl;
     }

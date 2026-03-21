@@ -77,10 +77,16 @@ public partial class App : Application
         if (settings.Current.ClipboardMonitorEnabled)
         {
             _clipboardService = GetService<ClipboardMonitorService>();
-            // Clipboard requires a visible window handle — we use the overlay
-            _overlayWindow.Show();
-            _clipboardService.Start(_overlayWindow);
-            _overlayWindow.Hide();
+            var clipboardHelper = new Window
+            {
+                Width = 0, Height = 0,
+                WindowStyle = System.Windows.WindowStyle.None,
+                ShowInTaskbar = false,
+                ShowActivated = false
+            };
+            clipboardHelper.Show();
+            _clipboardService.Start(clipboardHelper);
+            clipboardHelper.Hide();
             _clipboardService.ClipboardTextChanged += OnClipboardTextChanged;
         }
     }

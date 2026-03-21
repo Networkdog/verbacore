@@ -46,7 +46,6 @@ public partial class SettingsViewModel : ObservableObject
     private string _statusMessage = string.Empty;
 
     public string[] AvailableProviders { get; } = ["OpenAI", "Azure OpenAI"];
-    public string[] AvailableModels { get; } = ["gpt-4o-mini", "gpt-4o", "gpt-4-turbo"];
     public string[] AvailableThemes { get; } = ["System", "Light", "Dark"];
 
     public SettingsViewModel(SettingsService settingsService)

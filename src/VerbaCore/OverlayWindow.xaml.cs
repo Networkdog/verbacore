@@ -62,6 +62,22 @@ public partial class OverlayWindow : Window
 
         // Handle Tab key for mode switching (in the keyboard hook)
         PreviewKeyDown += (_, e) => e.Handled = true;
+
+        // Click outside the overlay content to close
+        MouseDown += OnOverlayMouseDown;
+    }
+
+    private void OnOverlayMouseDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    {
+        if (_isShown)
+        {
+            HideOverlay();
+        }
+    }
+
+    private void ContentBorder_MouseDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    {
+        e.Handled = true;
     }
 
     private void OnCapsLockPressed(object? sender, EventArgs e)
@@ -286,13 +302,8 @@ public partial class OverlayWindow : Window
 
     private void ShowOverlay()
     {
-        // Size to screen
-        var screen = SystemParameters.PrimaryScreenWidth;
-        Width = Math.Min(700, screen * 0.5);
-        Left = (screen - Width) / 2;
-        Top = SystemParameters.PrimaryScreenHeight * 0.25;
-
         _isShown = true;
+        WindowState = System.Windows.WindowState.Maximized;
         Show();
 
         var fadeIn = new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(120));
@@ -308,7 +319,11 @@ public partial class OverlayWindow : Window
         _capsLockService.PersistentModeActive = false;
 
         var fadeOut = new DoubleAnimation(1, 0, TimeSpan.FromMilliseconds(150));
-        fadeOut.Completed += (_, _) => Hide();
+        fadeOut.Completed += (_, _) =>
+        {
+            Hide();
+            WindowState = System.Windows.WindowState.Normal;
+        };
         RootGrid.BeginAnimation(OpacityProperty, fadeOut);
     }
 

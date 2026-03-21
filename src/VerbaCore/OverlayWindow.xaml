@@ -8,16 +8,20 @@
         Topmost="True"
         ShowInTaskbar="False"
         WindowStartupLocation="CenterScreen"
-        Width="700" Height="400"
         ResizeMode="NoResize"
-        Focusable="False"
-        ShowActivated="False">
+        Focusable="False">
 
-    <Grid x:Name="RootGrid" Opacity="0">
+    <Grid x:Name="RootGrid" Opacity="0"
+          Background="Transparent">
         <!-- Semi-transparent backdrop -->
         <Border Background="#CC1A1A2E"
                 CornerRadius="16"
-                Margin="20">
+                Margin="20"
+                MouseDown="ContentBorder_MouseDown"
+                MaxWidth="660"
+                MaxHeight="400"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center">
             <Border.Effect>
                 <DropShadowEffect BlurRadius="30" ShadowDepth="0" Opacity="0.5" Color="Black" />
             </Border.Effect>

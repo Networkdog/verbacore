@@ -33,9 +33,10 @@
 
             <ui:Card Margin="0,0,0,8">
                 <StackPanel>
-                    <TextBlock Text="AI 모델" Margin="0,0,0,4" FontSize="12" Opacity="0.7" />
-                    <ComboBox ItemsSource="{Binding AvailableModels}"
-                              SelectedItem="{Binding SelectedModel}" />
+                    <TextBlock Text="배포 이름 (Deployment / Model)" Margin="0,0,0,4" FontSize="12" Opacity="0.7" />
+                    <ui:TextBox Text="{Binding SelectedModel, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                PlaceholderText="gpt-4o-mini" />
+                    <TextBlock Text="OpenAI: 모델 이름 (gpt-4o-mini 등) / Azure: 배포 이름" FontSize="10" Opacity="0.5" Margin="0,4,0,0" />
                 </StackPanel>
             </ui:Card>
 
@@ -46,14 +47,6 @@
                         <TextBlock Text="Azure Endpoint" Margin="0,0,0,4" FontSize="12" Opacity="0.7" />
                         <ui:TextBox Text="{Binding AzureEndpoint, Mode=TwoWay}"
                                     PlaceholderText="https://your-resource.openai.azure.com" />
-                    </StackPanel>
-                </ui:Card>
-
-                <ui:Card Margin="0,0,0,8">
-                    <StackPanel>
-                        <TextBlock Text="배포 이름 (Deployment Name)" Margin="0,0,0,4" FontSize="12" Opacity="0.7" />
-                        <ui:TextBox Text="{Binding AzureDeploymentName, Mode=TwoWay}"
-                                    PlaceholderText="gpt-4o-mini" />
                     </StackPanel>
                 </ui:Card>
 
