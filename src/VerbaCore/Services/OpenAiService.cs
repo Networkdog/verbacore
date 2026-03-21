@@ -113,21 +113,33 @@ public sealed class OpenAiService : IOpenAiService
     private ChatCompletionRequest CreateRequest(string input, LookupMode mode,
         string sourceLanguage, string targetLanguage, bool stream)
     {
-        return new ChatCompletionRequest
+        var effort = _settings.Current.ReasoningEffort;
+        var isReasoning = !string.IsNullOrEmpty(effort) && effort != "none";
+
+        var request = new ChatCompletionRequest
         {
             Model = _settings.Current.Model,
             Stream = stream,
             Messages =
             [
-                new ChatMessage { Role = "system", Content = _promptBuilder.GetSystemMessage(mode) },
+                new ChatMessage
+                {
+                    // Reasoning models use "developer" role instead of "system"
+                    Role = isReasoning ? "developer" : "system",
+                    Content = _promptBuilder.GetSystemMessage(mode)
+                },
                 new ChatMessage
                 {
                     Role = "user",
                     Content = _promptBuilder.Build(input, mode, sourceLanguage, targetLanguage)
                 }
             ],
-            Temperature = 0.3
+            // Reasoning models don't support temperature
+            Temperature = isReasoning ? null : 0.3,
+            ReasoningEffort = isReasoning ? effort : null
         };
+
+        return request;
     }
 
     // --- Request/Response DTOs ---
@@ -137,7 +149,12 @@ public sealed class OpenAiService : IOpenAiService
         [JsonPropertyName("model")] public string Model { get; set; } = "gpt-4o-mini";
         [JsonPropertyName("messages")] public List<ChatMessage> Messages { get; set; } = [];
         [JsonPropertyName("stream")] public bool Stream { get; set; }
-        [JsonPropertyName("temperature")] public double Temperature { get; set; } = 0.3;
+        [JsonPropertyName("temperature")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public double? Temperature { get; set; } = 0.3;
+        [JsonPropertyName("reasoning_effort")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? ReasoningEffort { get; set; }
     }
 
     private sealed class ChatMessage

@@ -19,6 +19,9 @@ public partial class SettingsViewModel : ObservableObject
     private string _selectedModel = "gpt-4o-mini";
 
     [ObservableProperty]
+    private string _reasoningEffort = "none";
+
+    [ObservableProperty]
     private string _azureEndpoint = string.Empty;
 
     [ObservableProperty]
@@ -46,6 +49,7 @@ public partial class SettingsViewModel : ObservableObject
     private string _statusMessage = string.Empty;
 
     public string[] AvailableProviders { get; } = ["OpenAI", "Azure OpenAI"];
+    public string[] AvailableReasoningEfforts { get; } = ["none", "minimal", "low", "medium", "high", "xhigh"];
     public string[] AvailableThemes { get; } = ["System", "Light", "Dark"];
 
     public SettingsViewModel(SettingsService settingsService)
@@ -61,6 +65,7 @@ public partial class SettingsViewModel : ObservableObject
         IsAzure = s.Provider == ApiProvider.AzureOpenAI;
         ApiKey = s.ApiKey;
         SelectedModel = s.Model;
+        ReasoningEffort = s.ReasoningEffort;
         AzureEndpoint = s.AzureEndpoint;
         AzureDeploymentName = s.AzureDeploymentName;
         AzureApiVersion = s.AzureApiVersion;
@@ -87,6 +92,7 @@ public partial class SettingsViewModel : ObservableObject
         s.Provider = SelectedProvider == "Azure OpenAI" ? ApiProvider.AzureOpenAI : ApiProvider.OpenAI;
         s.ApiKey = ApiKey;
         s.Model = SelectedModel;
+        s.ReasoningEffort = ReasoningEffort;
         s.AzureEndpoint = AzureEndpoint;
         s.AzureDeploymentName = AzureDeploymentName;
         s.AzureApiVersion = AzureApiVersion;

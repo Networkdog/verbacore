@@ -40,6 +40,23 @@
                 </StackPanel>
             </ui:Card>
 
+            <ui:Card Margin="0,0,0,8">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                        <TextBlock Text="Reasoning Effort" FontSize="13" />
+                        <TextBlock Text="GPT-5, o1, o3 등 reasoning 모델에서 사고 수준 조절" FontSize="10" Opacity="0.5" />
+                    </StackPanel>
+                    <ComboBox Grid.Column="1"
+                              ItemsSource="{Binding AvailableReasoningEfforts}"
+                              SelectedItem="{Binding ReasoningEffort}"
+                              MinWidth="100" />
+                </Grid>
+            </ui:Card>
+
             <!-- Azure OpenAI Settings -->
             <StackPanel Visibility="{Binding IsAzure, Converter={StaticResource BoolToVisibilityConverter}}">
                 <ui:Card Margin="0,0,0,8">

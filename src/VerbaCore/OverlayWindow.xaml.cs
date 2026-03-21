@@ -69,7 +69,44 @@ public partial class OverlayWindow : Window
         _capsLockService.EnterPressed += OnEnterPressed;
 
         // Handle Tab key for mode switching (in the keyboard hook)
-        PreviewKeyDown += (_, e) => e.Handled = true;
+        PreviewKeyDown += (_, e) =>
+        {
+            // In persistent mode, let the TextBox handle input
+            if (_persistentMode && e.Key != System.Windows.Input.Key.Tab)
+                return;
+            e.Handled = true;
+        };
+
+        // TextBox Enter key handler for persistent mode
+        InputTextBox.PreviewKeyDown += OnInputTextBoxKeyDown;
+    }
+
+    private void OnInputTextBoxKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+    {
+        if (e.Key == System.Windows.Input.Key.Enter)
+        {
+            e.Handled = true;
+            var input = InputTextBox.Text.Trim();
+            if (!string.IsNullOrEmpty(input))
+            {
+                _cursorBlinkTimer.Stop();
+                BlinkingCursor.Visibility = Visibility.Collapsed;
+                HintLabel.Visibility = Visibility.Collapsed;
+                _ = PerformLookupAsync(input);
+            }
+        }
+        else if (e.Key == System.Windows.Input.Key.Escape)
+        {
+            e.Handled = true;
+            HideOverlay();
+        }
+        else if (e.Key == System.Windows.Input.Key.Tab)
+        {
+            e.Handled = true;
+            _modeIndex = (_modeIndex + 1) % _modes.Length;
+            _currentMode = _modes[_modeIndex];
+            UpdateModeLabel();
+        }
     }
 
     private void OnCapsLockPressed(object? sender, EventArgs e)
@@ -86,6 +123,9 @@ public partial class OverlayWindow : Window
 
             // Reset UI for new input
             InputDisplay.Text = "";
+            InputDisplay.Visibility = Visibility.Visible;
+            InputTextBox.Text = "";
+            InputTextBox.Visibility = Visibility.Collapsed;
             ResultViewer.Document = new FlowDocument();
             ResultViewer.Visibility = Visibility.Collapsed;
             LoadingPanel.Visibility = Visibility.Collapsed;
@@ -123,23 +163,35 @@ public partial class OverlayWindow : Window
             }
             else
             {
-                // First quick tap — enter persistent mode
+                // First quick tap — enter persistent mode with IME TextBox
                 _persistentMode = true;
-                _capsLockService.PersistentModeActive = true;
-                _cursorBlinkTimer.Start();
-                BlinkingCursor.Visibility = Visibility.Visible;
+                _capsLockService.PersistentModeActive = false; // Don't intercept keys — let TextBox handle them
                 StatusLabel.Text = "단어를 입력하세요 — Enter: 조회, CapsLock: 닫기";
+
+                // Switch to TextBox UI
+                InputDisplay.Text = "";
+                InputDisplay.Visibility = Visibility.Collapsed;
+                InputTextBox.Text = "";
+                InputTextBox.Visibility = Visibility.Visible;
+                BlinkingCursor.Visibility = Visibility.Collapsed;
+                ResultViewer.Document = new FlowDocument();
+                ResultViewer.Visibility = Visibility.Collapsed;
+                LoadingPanel.Visibility = Visibility.Collapsed;
+                HintLabel.Visibility = Visibility.Visible;
+                UpdateModeLabel();
 
                 if (!_isShown)
                 {
-                    InputDisplay.Text = "";
-                    ResultViewer.Document = new FlowDocument();
-                    ResultViewer.Visibility = Visibility.Collapsed;
-                    LoadingPanel.Visibility = Visibility.Collapsed;
-                    HintLabel.Visibility = Visibility.Visible;
-                    UpdateModeLabel();
                     ShowOverlay();
                 }
+
+                // Focus the TextBox for IME input
+                Activate();
+                Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Input, () =>
+                {
+                    InputTextBox.Focus();
+                    System.Windows.Input.Keyboard.Focus(InputTextBox);
+                });
             }
         });
     }
@@ -171,21 +223,32 @@ public partial class OverlayWindow : Window
     }
 
     /// <summary>
-    /// Enter pressed in persistent mode — trigger lookup.
+    /// Enter pressed in persistent mode (from keyboard hook) — trigger lookup.
     /// </summary>
     private void OnEnterPressed(object? sender, EventArgs e)
     {
         Dispatcher.Invoke(() =>
         {
+            // In persistent mode we use the TextBox, so read from it
+            if (_persistentMode)
+            {
+                var input = InputTextBox.Text.Trim();
+                if (!string.IsNullOrEmpty(input))
+                {
+                    HintLabel.Visibility = Visibility.Collapsed;
+                    _ = PerformLookupAsync(input);
+                }
+                return;
+            }
+
             _cursorBlinkTimer.Stop();
             BlinkingCursor.Visibility = Visibility.Collapsed;
             HintLabel.Visibility = Visibility.Collapsed;
 
-            var input = _capsLockService.Buffer.Trim();
-            if (string.IsNullOrEmpty(input)) return;
+            var bufferInput = _capsLockService.Buffer.Trim();
+            if (string.IsNullOrEmpty(bufferInput)) return;
 
-            // Stay in persistent mode — show result on overlay
-            _ = PerformLookupAsync(input);
+            _ = PerformLookupAsync(bufferInput);
         });
     }
 
@@ -246,7 +309,7 @@ public partial class OverlayWindow : Window
         var ct = _cts.Token;
 
         LoadingPanel.Visibility = Visibility.Visible;
-        StatusLabel.Text = "조회 중...";
+        StatusLabel.Text = "";
 
         var src = _settingsService.Current.SourceLanguage;
         var tgt = _settingsService.Current.TargetLanguage;
@@ -302,6 +365,7 @@ public partial class OverlayWindow : Window
 
         _isShown = true;
         Show();
+        Activate();
 
         var fadeIn = new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(120));
         RootGrid.BeginAnimation(OpacityProperty, fadeIn);
@@ -314,6 +378,10 @@ public partial class OverlayWindow : Window
         _isShown = false;
         _persistentMode = false;
         _capsLockService.PersistentModeActive = false;
+
+        // Reset TextBox/TextBlock visibility
+        InputTextBox.Visibility = Visibility.Collapsed;
+        InputDisplay.Visibility = Visibility.Visible;
 
         var fadeOut = new DoubleAnimation(1, 0, TimeSpan.FromMilliseconds(150));
         fadeOut.Completed += (_, _) => Hide();
@@ -337,16 +405,11 @@ public partial class OverlayWindow : Window
         try
         {
             var doc = Markdig.Wpf.Markdown.ToFlowDocument(markdown, MarkdownPipeline);
-            // Style the document for dark overlay
-            doc.Foreground = new SolidColorBrush(Color.FromArgb(0xE0, 0xFF, 0xFF, 0xFF));
-            doc.FontSize = 14;
-            doc.FontFamily = new FontFamily("Segoe UI");
-            doc.PagePadding = new Thickness(0);
+            ApplyDarkThemeToDocument(doc);
             ResultViewer.Document = doc;
         }
         catch
         {
-            // Fallback to plain text if markdown parsing fails
             var doc = new FlowDocument(new Paragraph(new Run(markdown)))
             {
                 Foreground = new SolidColorBrush(Color.FromArgb(0xE0, 0xFF, 0xFF, 0xFF)),
@@ -355,6 +418,93 @@ public partial class OverlayWindow : Window
                 PagePadding = new Thickness(0)
             };
             ResultViewer.Document = doc;
+        }
+    }
+
+    /// <summary>
+    /// Recursively apply bright colors to all elements for dark overlay background.
+    /// </summary>
+    private static void ApplyDarkThemeToDocument(FlowDocument doc)
+    {
+        doc.Foreground = new SolidColorBrush(Color.FromArgb(0xE0, 0xFF, 0xFF, 0xFF));
+        doc.FontSize = 14;
+        doc.FontFamily = new FontFamily("Segoe UI");
+        doc.PagePadding = new Thickness(0);
+
+        foreach (var block in doc.Blocks)
+        {
+            ApplyDarkThemeToBlock(block);
+        }
+    }
+
+    private static void ApplyDarkThemeToBlock(System.Windows.Documents.Block block)
+    {
+        block.Foreground = new SolidColorBrush(Color.FromArgb(0xE0, 0xFF, 0xFF, 0xFF));
+
+        if (block is Paragraph p)
+        {
+            // Headings: brighter and larger
+            if (p.Tag is string tag && tag.StartsWith("Heading"))
+            {
+                p.Foreground = new SolidColorBrush(Colors.White);
+            }
+
+            foreach (var inline in p.Inlines)
+            {
+                ApplyDarkThemeToInline(inline);
+            }
+        }
+        else if (block is System.Windows.Documents.List list)
+        {
+            foreach (var item in list.ListItems)
+            {
+                foreach (var itemBlock in item.Blocks)
+                {
+                    ApplyDarkThemeToBlock(itemBlock);
+                }
+            }
+        }
+        else if (block is System.Windows.Documents.Section section)
+        {
+            foreach (var sBlock in section.Blocks)
+            {
+                ApplyDarkThemeToBlock(sBlock);
+            }
+        }
+        else if (block is System.Windows.Documents.Table table)
+        {
+            table.Foreground = new SolidColorBrush(Color.FromArgb(0xE0, 0xFF, 0xFF, 0xFF));
+        }
+    }
+
+    private static void ApplyDarkThemeToInline(System.Windows.Documents.Inline inline)
+    {
+        inline.Foreground = new SolidColorBrush(Color.FromArgb(0xE0, 0xFF, 0xFF, 0xFF));
+
+        // Bold: pure white
+        if (inline is System.Windows.Documents.Bold bold)
+        {
+            bold.Foreground = new SolidColorBrush(Colors.White);
+            foreach (var child in bold.Inlines)
+                ApplyDarkThemeToInline(child);
+        }
+        // Italic: slightly tinted
+        else if (inline is System.Windows.Documents.Italic italic)
+        {
+            italic.Foreground = new SolidColorBrush(Color.FromArgb(0xD0, 0xCC, 0xDD, 0xFF));
+            foreach (var child in italic.Inlines)
+                ApplyDarkThemeToInline(child);
+        }
+        // Inline code: light cyan
+        else if (inline is System.Windows.Documents.Run run && run.Background != null)
+        {
+            run.Foreground = new SolidColorBrush(Color.FromArgb(0xFF, 0xA0, 0xE0, 0xFF));
+            run.Background = new SolidColorBrush(Color.FromArgb(0x30, 0xFF, 0xFF, 0xFF));
+        }
+        else if (inline is System.Windows.Documents.Span span)
+        {
+            foreach (var child in span.Inlines)
+                ApplyDarkThemeToInline(child);
         }
     }
 }

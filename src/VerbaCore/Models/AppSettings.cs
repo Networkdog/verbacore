@@ -6,6 +6,7 @@ public sealed class AppSettings
     public string ApiKey { get; set; } = string.Empty;
     public string ApiKeyProtected { get; set; } = string.Empty;
     public string Model { get; set; } = "gpt-4o-mini";
+    public string ReasoningEffort { get; set; } = "none";
 
     // Azure OpenAI specific
     public string AzureEndpoint { get; set; } = string.Empty;

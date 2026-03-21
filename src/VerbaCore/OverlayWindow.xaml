@@ -10,7 +10,7 @@
         WindowStartupLocation="CenterScreen"
         Width="700" Height="400"
         ResizeMode="NoResize"
-        Focusable="False">
+        Focusable="True">
 
     <Grid x:Name="RootGrid" Opacity="0">
         <!-- Semi-transparent backdrop -->
@@ -52,7 +52,7 @@
                                x:Name="HintLabel" />
                 </StackPanel>
 
-                <!-- Input text (large, Enso-style) -->
+                <!-- Input text (large, Enso-style) - for long-press mode -->
                 <TextBlock Grid.Row="1"
                            x:Name="InputDisplay"
                            Text=""
@@ -62,7 +62,38 @@
                            TextWrapping="Wrap"
                            Margin="0,0,0,8" />
 
-                <!-- Blinking cursor -->
+                <!-- IME-enabled input for persistent (quick-tap) mode - supports Korean -->
+                <TextBox Grid.Row="1"
+                         x:Name="InputTextBox"
+                         FontSize="32"
+                         FontWeight="Light"
+                         Foreground="White"
+                         CaretBrush="White"
+                         SelectionBrush="#5500AAFF"
+                         Margin="0,0,0,8"
+                         Visibility="Collapsed"
+                         AcceptsReturn="False"
+                         TextWrapping="Wrap">
+                    <TextBox.Style>
+                        <Style TargetType="TextBox">
+                            <Setter Property="Background" Value="Transparent" />
+                            <Setter Property="BorderThickness" Value="0" />
+                            <Setter Property="BorderBrush" Value="Transparent" />
+                            <Setter Property="Padding" Value="0" />
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="TextBox">
+                                        <ScrollViewer x:Name="PART_ContentHost"
+                                                      Background="Transparent"
+                                                      Focusable="False" />
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                    </TextBox.Style>
+                </TextBox>
+
+                <!-- Blinking cursor (Enso mode only) -->
                 <Border Grid.Row="1"
                         x:Name="BlinkingCursor"
                         Width="2" Height="40"

@@ -56,6 +56,7 @@ public sealed class SettingsService
             Provider = _current.Provider,
             ApiKeyProtected = _current.ApiKeyProtected,
             Model = _current.Model,
+            ReasoningEffort = _current.ReasoningEffort,
             AzureEndpoint = _current.AzureEndpoint,
             AzureDeploymentName = _current.AzureDeploymentName,
             AzureApiVersion = _current.AzureApiVersion,
