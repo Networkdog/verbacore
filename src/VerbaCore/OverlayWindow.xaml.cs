@@ -467,7 +467,7 @@ public partial class OverlayWindow : Window
         var doc = new FlowDocument(new Paragraph(new Run(text)))
         {
             Foreground = new SolidColorBrush(Color.FromArgb(0xE0, 0xFF, 0xFF, 0xFF)),
-            FontSize = 28,
+            FontSize = 20,
             FontFamily = new FontFamily("AppleSDGothicNeoR00, Segoe UI"),
             PagePadding = new Thickness(0)
         };
@@ -479,27 +479,38 @@ public partial class OverlayWindow : Window
     /// </summary>
     private static void ApplyDarkThemeToDocument(FlowDocument doc)
     {
+        var baseFontSize = 20.0;
         doc.Foreground = new SolidColorBrush(Color.FromArgb(0xE0, 0xFF, 0xFF, 0xFF));
-        doc.FontSize = 28;
+        doc.FontSize = baseFontSize;
         doc.FontFamily = new FontFamily("AppleSDGothicNeoR00, Segoe UI");
         doc.PagePadding = new Thickness(0);
 
         foreach (var block in doc.Blocks)
         {
-            ApplyDarkThemeToBlock(block);
+            ApplyDarkThemeToBlock(block, baseFontSize);
         }
     }
 
-    private static void ApplyDarkThemeToBlock(System.Windows.Documents.Block block)
+    private static void ApplyDarkThemeToBlock(System.Windows.Documents.Block block, double baseFontSize)
     {
         block.Foreground = new SolidColorBrush(Color.FromArgb(0xE0, 0xFF, 0xFF, 0xFF));
 
         if (block is Paragraph p)
         {
-            // Headings: brighter and larger
-            if (p.Tag is string tag && tag.StartsWith("Heading"))
+            // Detect headings: Markdig.Wpf sets FontSize relative to document base
+            // If the paragraph has a FontSize explicitly set and it differs from base, it's a heading
+            var pFontSize = p.FontSize;
+            bool isHeading = !double.IsNaN(pFontSize) && pFontSize != baseFontSize;
+
+            if (isHeading)
             {
+                // Scale headings relative to base font size
+                // Markdig.Wpf typically uses ratios like 2.0, 1.5, 1.17, 1.0 for h1-h4
+                double ratio = pFontSize / 12.0; // Markdig default base is ~12
+                p.FontSize = baseFontSize * Math.Max(ratio, 1.2);
                 p.Foreground = new SolidColorBrush(Colors.White);
+                p.FontWeight = System.Windows.FontWeights.Bold;
+                p.Margin = new Thickness(0, 8, 0, 4);
             }
 
             foreach (var inline in p.Inlines)
@@ -513,7 +524,7 @@ public partial class OverlayWindow : Window
             {
                 foreach (var itemBlock in item.Blocks)
                 {
-                    ApplyDarkThemeToBlock(itemBlock);
+                    ApplyDarkThemeToBlock(itemBlock, baseFontSize);
                 }
             }
         }
@@ -521,7 +532,7 @@ public partial class OverlayWindow : Window
         {
             foreach (var sBlock in section.Blocks)
             {
-                ApplyDarkThemeToBlock(sBlock);
+                ApplyDarkThemeToBlock(sBlock, baseFontSize);
             }
         }
         else if (block is System.Windows.Documents.Table table)
