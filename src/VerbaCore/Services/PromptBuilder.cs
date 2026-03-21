@@ -58,15 +58,6 @@ public sealed class PromptBuilder
             ### 활용 예시
             * {English Sentence 1} - {Korean Translation} ({Explanation & Nuance})
             * {English Sentence 2} - {Korean Translation} ({Explanation & Nuance})
-            * {English Sentence 3} - {Korean Translation} ({Explanation & Nuance})
-
-            ### 유의어
-            * **{Word 1}** [{Korean Pronunciation}] {Part of Speech}. {Meaning} ({Nuance difference vs. Input Word})
-            * (Provide at least 4 following this format)
-
-            ### 반의어
-            * **{Word 1}** [{Korean Pronunciation}] {Part of Speech}. {Meaning} ({Nuance difference vs. Input Word})
-            * (Provide at least 4 following this format)
 
             [Input Word]: {{word}}
             """;

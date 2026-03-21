@@ -32,7 +32,12 @@ public partial class App : Application
         services.AddSingleton<ClipboardMonitorService>();
         services.AddSingleton<SpeechInputService>();
         services.AddSingleton<CursorTextService>();
-        services.AddHttpClient<IOpenAiService, OpenAiService>();
+        services.AddHttpClient<IOpenAiService, OpenAiService>(client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(60);
+            client.DefaultRequestVersion = new Version(2, 0);
+            client.DefaultVersionPolicy = System.Net.Http.HttpVersionPolicy.RequestVersionOrLower;
+        });
 
         // ViewModels
         services.AddSingleton<SettingsViewModel>();

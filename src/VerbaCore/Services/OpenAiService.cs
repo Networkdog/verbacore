@@ -89,12 +89,13 @@ public sealed class OpenAiService : IOpenAiService
             HttpCompletionOption.ResponseHeadersRead, ct);
         response.EnsureSuccessStatusCode();
 
-        using var stream = await response.Content.ReadAsStreamAsync(ct);
-        using var reader = new System.IO.StreamReader(stream);
+        await using var stream = await response.Content.ReadAsStreamAsync(ct);
+        using var reader = new System.IO.StreamReader(stream, Encoding.UTF8, false, bufferSize: 256);
 
         while (!reader.EndOfStream && !ct.IsCancellationRequested)
         {
             var line = await reader.ReadLineAsync(ct);
+            if (line == null) break;
             if (string.IsNullOrWhiteSpace(line)) continue;
             if (!line.StartsWith("data: ")) continue;
 
@@ -137,7 +138,7 @@ public sealed class OpenAiService : IOpenAiService
             // Reasoning models don't support temperature
             Temperature = isReasoning ? null : 0.3,
             ReasoningEffort = isReasoning ? effort : null,
-            MaxTokens = isReasoning ? null : 4096
+            MaxTokens = isReasoning ? null : (mode == LookupMode.Dictionary ? 2048 : 4096)
         };
 
         return request;

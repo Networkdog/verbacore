@@ -22,7 +22,7 @@ public partial class OverlayWindow : Window
     private readonly DispatcherTimer _autoHideTimer;
     private CancellationTokenSource? _cts;
     private DateTime _lastRenderTime = DateTime.MinValue;
-    private const int RenderThrottleMs = 300;
+    private const int RenderThrottleMs = 200;
 
     private LookupMode _currentMode = LookupMode.Dictionary;
     private readonly LookupMode[] _modes = [LookupMode.Dictionary, LookupMode.Translate, LookupMode.Analyze];
@@ -56,7 +56,7 @@ public partial class OverlayWindow : Window
             BlinkingCursor.Opacity = BlinkingCursor.Opacity > 0.1 ? 0 : 0.8;
 
         // Auto-hide timer (hide result after delay)
-        _autoHideTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(15) };
+        _autoHideTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(60) };
         _autoHideTimer.Tick += (_, _) =>
         {
             _autoHideTimer.Stop();
@@ -76,8 +76,30 @@ public partial class OverlayWindow : Window
             // In persistent mode, let the TextBox handle input
             if (_persistentMode && e.Key != System.Windows.Input.Key.Tab)
                 return;
+
+            // While viewing results, allow Escape to close but don't eat other keys
+            if (ResultViewer.Visibility == Visibility.Visible)
+            {
+                if (e.Key == System.Windows.Input.Key.Escape)
+                {
+                    HideOverlay();
+                    e.Handled = true;
+                }
+                // Reset auto-hide timer on any key press
+                if (_autoHideTimer.IsEnabled)
+                {
+                    _autoHideTimer.Stop();
+                    _autoHideTimer.Start();
+                }
+                return;
+            }
+
             e.Handled = true;
         };
+
+        // Reset auto-hide timer on mouse interaction (scrolling)
+        PreviewMouseDown += (_, _) => ResetAutoHideTimer();
+        PreviewMouseWheel += (_, _) => ResetAutoHideTimer();
 
         // TextBox Enter key handler for persistent mode
         InputTextBox.PreviewKeyDown += OnInputTextBoxKeyDown;
@@ -310,7 +332,10 @@ public partial class OverlayWindow : Window
         _cts = new CancellationTokenSource();
         var ct = _cts.Token;
 
-        LoadingPanel.Visibility = Visibility.Visible;
+        // Show result area immediately — no loading spinner
+        LoadingPanel.Visibility = Visibility.Collapsed;
+        ResultViewer.Visibility = Visibility.Visible;
+        RenderPlainText("...");
         StatusLabel.Text = "";
 
         var src = _settingsService.Current.SourceLanguage;
@@ -323,19 +348,19 @@ public partial class OverlayWindow : Window
                 input, _currentMode, src, tgt, ct))
             {
                 sb.Append(chunk);
-                LoadingPanel.Visibility = Visibility.Collapsed;
-                ResultViewer.Visibility = Visibility.Visible;
 
-                // Throttle rendering — only re-render every 300ms during streaming
+                // Throttled rendering during streaming
                 var now = DateTime.UtcNow;
                 if ((now - _lastRenderTime).TotalMilliseconds >= RenderThrottleMs)
                 {
                     _lastRenderTime = now;
-                    RenderMarkdown(sb.ToString());
+                    RenderPlainText(sb.ToString());
+                    // Force UI to paint
+                    await Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.Render);
                 }
             }
 
-            // Final render with complete text
+            // Final render with full Markdown formatting
             RenderMarkdown(sb.ToString());
 
             StatusLabel.Text = "완료 — 아무 키를 누르면 닫힙니다";
@@ -359,10 +384,18 @@ public partial class OverlayWindow : Window
         }
         catch (Exception ex)
         {
-            LoadingPanel.Visibility = Visibility.Collapsed;
             ResultViewer.Visibility = Visibility.Visible;
             RenderMarkdown($"오류: {ex.Message}\n\nAPI Key와 네트워크를 확인해주세요.");
             StatusLabel.Text = "오류 발생";
+            _autoHideTimer.Start();
+        }
+    }
+
+    private void ResetAutoHideTimer()
+    {
+        if (_autoHideTimer.IsEnabled)
+        {
+            _autoHideTimer.Stop();
             _autoHideTimer.Start();
         }
     }
@@ -422,15 +455,23 @@ public partial class OverlayWindow : Window
         }
         catch
         {
-            var doc = new FlowDocument(new Paragraph(new Run(markdown)))
-            {
-                Foreground = new SolidColorBrush(Color.FromArgb(0xE0, 0xFF, 0xFF, 0xFF)),
-                FontSize = 28,
-                FontFamily = new FontFamily("AppleSDGothicNeoR00, Segoe UI"),
-                PagePadding = new Thickness(0)
-            };
-            ResultViewer.Document = doc;
+            RenderPlainText(markdown);
         }
+    }
+
+    /// <summary>
+    /// Fast plain-text rendering used during streaming (no Markdown parsing overhead).
+    /// </summary>
+    private void RenderPlainText(string text)
+    {
+        var doc = new FlowDocument(new Paragraph(new Run(text)))
+        {
+            Foreground = new SolidColorBrush(Color.FromArgb(0xE0, 0xFF, 0xFF, 0xFF)),
+            FontSize = 28,
+            FontFamily = new FontFamily("AppleSDGothicNeoR00, Segoe UI"),
+            PagePadding = new Thickness(0)
+        };
+        ResultViewer.Document = doc;
     }
 
     /// <summary>
