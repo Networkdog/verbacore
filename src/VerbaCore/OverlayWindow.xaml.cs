@@ -21,6 +21,8 @@ public partial class OverlayWindow : Window
     private readonly DispatcherTimer _cursorBlinkTimer;
     private readonly DispatcherTimer _autoHideTimer;
     private CancellationTokenSource? _cts;
+    private DateTime _lastRenderTime = DateTime.MinValue;
+    private const int RenderThrottleMs = 300;
 
     private LookupMode _currentMode = LookupMode.Dictionary;
     private readonly LookupMode[] _modes = [LookupMode.Dictionary, LookupMode.Translate, LookupMode.Analyze];
@@ -323,8 +325,18 @@ public partial class OverlayWindow : Window
                 sb.Append(chunk);
                 LoadingPanel.Visibility = Visibility.Collapsed;
                 ResultViewer.Visibility = Visibility.Visible;
-                RenderMarkdown(sb.ToString());
+
+                // Throttle rendering — only re-render every 300ms during streaming
+                var now = DateTime.UtcNow;
+                if ((now - _lastRenderTime).TotalMilliseconds >= RenderThrottleMs)
+                {
+                    _lastRenderTime = now;
+                    RenderMarkdown(sb.ToString());
+                }
             }
+
+            // Final render with complete text
+            RenderMarkdown(sb.ToString());
 
             StatusLabel.Text = "완료 — 아무 키를 누르면 닫힙니다";
 
@@ -413,8 +425,8 @@ public partial class OverlayWindow : Window
             var doc = new FlowDocument(new Paragraph(new Run(markdown)))
             {
                 Foreground = new SolidColorBrush(Color.FromArgb(0xE0, 0xFF, 0xFF, 0xFF)),
-                FontSize = 14,
-                FontFamily = new FontFamily("Segoe UI"),
+                FontSize = 28,
+                FontFamily = new FontFamily("AppleSDGothicNeoR00, Segoe UI"),
                 PagePadding = new Thickness(0)
             };
             ResultViewer.Document = doc;
@@ -427,8 +439,8 @@ public partial class OverlayWindow : Window
     private static void ApplyDarkThemeToDocument(FlowDocument doc)
     {
         doc.Foreground = new SolidColorBrush(Color.FromArgb(0xE0, 0xFF, 0xFF, 0xFF));
-        doc.FontSize = 14;
-        doc.FontFamily = new FontFamily("Segoe UI");
+        doc.FontSize = 28;
+        doc.FontFamily = new FontFamily("AppleSDGothicNeoR00, Segoe UI");
         doc.PagePadding = new Thickness(0);
 
         foreach (var block in doc.Blocks)

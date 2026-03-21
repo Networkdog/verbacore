@@ -8,7 +8,7 @@
         Topmost="True"
         ShowInTaskbar="False"
         WindowStartupLocation="CenterScreen"
-        Width="700" Height="400"
+        Width="800" Height="600"
         ResizeMode="NoResize"
         Focusable="True">
 
@@ -33,20 +33,24 @@
                 <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,12">
                     <TextBlock x:Name="ModeLabel"
                                Text="📖 사전"
-                               FontSize="13"
+                               FontSize="15"
+                               FontFamily="AppleSDGothicNeoR00, Segoe UI"
                                Foreground="#80FFFFFF"
                                VerticalAlignment="Center" />
                     <TextBlock Text="  ·  "
-                               FontSize="13"
+                               FontSize="15"
+                               FontFamily="AppleSDGothicNeoR00, Segoe UI"
                                Foreground="#40FFFFFF"
                                VerticalAlignment="Center" />
                     <TextBlock x:Name="LangLabel"
                                Text="EN → KO"
-                               FontSize="13"
+                               FontSize="15"
+                               FontFamily="AppleSDGothicNeoR00, Segoe UI"
                                Foreground="#80FFFFFF"
                                VerticalAlignment="Center" />
                     <TextBlock Text="  ·  Tab: 모드 전환"
-                               FontSize="11"
+                               FontSize="15"
+                               FontFamily="AppleSDGothicNeoR00, Segoe UI"
                                Foreground="#40FFFFFF"
                                VerticalAlignment="Center"
                                x:Name="HintLabel" />
@@ -56,8 +60,9 @@
                 <TextBlock Grid.Row="1"
                            x:Name="InputDisplay"
                            Text=""
-                           FontSize="36"
+                           FontSize="72"
                            FontWeight="Light"
+                           FontFamily="AppleSDGothicNeoR00, Segoe UI"
                            Foreground="White"
                            TextWrapping="Wrap"
                            Margin="0,0,0,8" />
@@ -65,8 +70,9 @@
                 <!-- IME-enabled input for persistent (quick-tap) mode - supports Korean -->
                 <TextBox Grid.Row="1"
                          x:Name="InputTextBox"
-                         FontSize="32"
+                         FontSize="64"
                          FontWeight="Light"
+                         FontFamily="AppleSDGothicNeoR00, Segoe UI"
                          Foreground="White"
                          CaretBrush="White"
                          SelectionBrush="#5500AAFF"
@@ -96,7 +102,7 @@
                 <!-- Blinking cursor (Enso mode only) -->
                 <Border Grid.Row="1"
                         x:Name="BlinkingCursor"
-                        Width="2" Height="40"
+                        Width="3" Height="80"
                         Background="White"
                         HorizontalAlignment="Left"
                         VerticalAlignment="Bottom"
@@ -112,8 +118,8 @@
                               Margin="0,8,0,0"
                               Background="Transparent"
                               Foreground="#E0FFFFFF"
-                              FontSize="14"
-                              FontFamily="Segoe UI"
+                              FontSize="15"
+                              FontFamily="AppleSDGothicNeoR00, Segoe UI"
                               IsToolBarVisible="False" />
 
                 <!-- Loading indicator -->
@@ -123,10 +129,11 @@
                             HorizontalAlignment="Center"
                             VerticalAlignment="Center">
                     <TextBlock Text="⏳"
-                               FontSize="24"
+                               FontSize="48"
                                HorizontalAlignment="Center" />
                     <TextBlock Text="조회 중..."
-                               FontSize="13"
+                               FontSize="26"
+                               FontFamily="AppleSDGothicNeoR00, Segoe UI"
                                Foreground="#80FFFFFF"
                                HorizontalAlignment="Center"
                                Margin="0,8,0,0" />
@@ -136,7 +143,8 @@
                 <TextBlock Grid.Row="3"
                            x:Name="StatusLabel"
                            Text="CapsLock을 누른 채로 단어를 입력하세요"
-                           FontSize="11"
+                           FontSize="15"
+                           FontFamily="AppleSDGothicNeoR00, Segoe UI"
                            Foreground="#50FFFFFF"
                            HorizontalAlignment="Center"
                            Margin="0,8,0,0" />

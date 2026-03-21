@@ -136,7 +136,8 @@ public sealed class OpenAiService : IOpenAiService
             ],
             // Reasoning models don't support temperature
             Temperature = isReasoning ? null : 0.3,
-            ReasoningEffort = isReasoning ? effort : null
+            ReasoningEffort = isReasoning ? effort : null,
+            MaxTokens = isReasoning ? null : 4096
         };
 
         return request;
@@ -155,6 +156,9 @@ public sealed class OpenAiService : IOpenAiService
         [JsonPropertyName("reasoning_effort")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public string? ReasoningEffort { get; set; }
+        [JsonPropertyName("max_tokens")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public int? MaxTokens { get; set; }
     }
 
     private sealed class ChatMessage
