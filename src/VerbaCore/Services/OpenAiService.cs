@@ -82,6 +82,7 @@ public sealed class OpenAiService : IOpenAiService
         var json = JsonSerializer.Serialize(request);
 
         using var httpRequest = new HttpRequestMessage(HttpMethod.Post, GetApiUrl());
+        httpRequest.Version = new Version(1, 1); // Force HTTP/1.1 for reliable SSE streaming
         ApplyAuth(httpRequest);
         httpRequest.Content = new StringContent(json, Encoding.UTF8, "application/json");
 
@@ -89,24 +90,39 @@ public sealed class OpenAiService : IOpenAiService
             HttpCompletionOption.ResponseHeadersRead, ct);
         response.EnsureSuccessStatusCode();
 
-        await using var stream = await response.Content.ReadAsStreamAsync(ct);
-        using var reader = new System.IO.StreamReader(stream, Encoding.UTF8, false, bufferSize: 256);
+        var responseStream = await response.Content.ReadAsStreamAsync(ct);
+        var reader = new System.IO.StreamReader(responseStream, Encoding.UTF8, false, bufferSize: 64);
 
-        while (!reader.EndOfStream && !ct.IsCancellationRequested)
+        var lineBuffer = new StringBuilder();
+        var charBuffer = new char[1];
+
+        while (!ct.IsCancellationRequested)
         {
-            var line = await reader.ReadLineAsync(ct);
-            if (line == null) break;
-            if (string.IsNullOrWhiteSpace(line)) continue;
-            if (!line.StartsWith("data: ")) continue;
+            var bytesRead = await reader.ReadAsync(charBuffer, 0, 1);
+            if (bytesRead == 0) yield break; // End of stream
 
-            var data = line["data: ".Length..];
-            if (data == "[DONE]") yield break;
-
-            var chunk = JsonSerializer.Deserialize<ChatCompletionChunk>(data);
-            var content = chunk?.Choices?.FirstOrDefault()?.Delta?.Content;
-            if (!string.IsNullOrEmpty(content))
+            var ch = charBuffer[0];
+            if (ch == '\n')
             {
-                yield return content;
+                var line = lineBuffer.ToString();
+                lineBuffer.Clear();
+
+                if (string.IsNullOrWhiteSpace(line)) continue;
+                if (!line.StartsWith("data: ")) continue;
+
+                var data = line["data: ".Length..];
+                if (data == "[DONE]") yield break;
+
+                var chunk = JsonSerializer.Deserialize<ChatCompletionChunk>(data);
+                var content = chunk?.Choices?.FirstOrDefault()?.Delta?.Content;
+                if (!string.IsNullOrEmpty(content))
+                {
+                    yield return content;
+                }
+            }
+            else if (ch != '\r')
+            {
+                lineBuffer.Append(ch);
             }
         }
     }

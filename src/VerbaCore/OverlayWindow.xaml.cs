@@ -39,6 +39,25 @@ public partial class OverlayWindow : Window
         .UseSupportedExtensions()
         .Build();
 
+    // Cached frozen brushes to avoid GC pressure
+    private static readonly SolidColorBrush TextBrush = CreateFrozenBrush(0xE0, 0xFF, 0xFF, 0xFF);
+    private static readonly SolidColorBrush WhiteBrush = CreateFrozenBrush(0xFF, 0xFF, 0xFF, 0xFF);
+    private static readonly SolidColorBrush ItalicBrush = CreateFrozenBrush(0xD0, 0xCC, 0xDD, 0xFF);
+    private static readonly SolidColorBrush CodeFgBrush = CreateFrozenBrush(0xFF, 0xA0, 0xE0, 0xFF);
+    private static readonly SolidColorBrush CodeBgBrush = CreateFrozenBrush(0x30, 0xFF, 0xFF, 0xFF);
+    private static readonly FontFamily AppFontFamily = new("AppleSDGothicNeoR00, Segoe UI");
+
+    // Reusable FlowDocument for plain text streaming
+    private FlowDocument? _plainTextDoc;
+    private Run? _plainTextRun;
+
+    private static SolidColorBrush CreateFrozenBrush(byte a, byte r, byte g, byte b)
+    {
+        var brush = new SolidColorBrush(Color.FromArgb(a, r, g, b));
+        brush.Freeze();
+        return brush;
+    }
+
     public OverlayWindow(
         IOpenAiService openAiService,
         SettingsService settingsService,
@@ -370,8 +389,7 @@ public partial class OverlayWindow : Window
                 {
                     _lastRenderTime = now;
                     RenderPlainText(sb.ToString());
-                    // Force UI to paint
-                    await Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.Render);
+                    await Task.Yield(); // Release UI thread to paint
                 }
             }
 
@@ -491,11 +509,13 @@ public partial class OverlayWindow : Window
     /// </summary>
     private void RenderPlainText(string text)
     {
-        var doc = new FlowDocument(new Paragraph(new Run(text)))
+        var run = new Run(text);
+        var para = new Paragraph(run);
+        var doc = new FlowDocument(para)
         {
-            Foreground = new SolidColorBrush(Color.FromArgb(0xE0, 0xFF, 0xFF, 0xFF)),
+            Foreground = TextBrush,
             FontSize = 20,
-            FontFamily = new FontFamily("AppleSDGothicNeoR00, Segoe UI"),
+            FontFamily = AppFontFamily,
             PagePadding = new Thickness(0)
         };
         ResultViewer.Document = doc;
@@ -507,9 +527,9 @@ public partial class OverlayWindow : Window
     private static void ApplyDarkThemeToDocument(FlowDocument doc)
     {
         var baseFontSize = 20.0;
-        doc.Foreground = new SolidColorBrush(Color.FromArgb(0xE0, 0xFF, 0xFF, 0xFF));
+        doc.Foreground = TextBrush;
         doc.FontSize = baseFontSize;
-        doc.FontFamily = new FontFamily("AppleSDGothicNeoR00, Segoe UI");
+        doc.FontFamily = AppFontFamily;
         doc.PagePadding = new Thickness(0);
 
         foreach (var block in doc.Blocks)
@@ -564,33 +584,30 @@ public partial class OverlayWindow : Window
         }
         else if (block is System.Windows.Documents.Table table)
         {
-            table.Foreground = new SolidColorBrush(Color.FromArgb(0xE0, 0xFF, 0xFF, 0xFF));
+            table.Foreground = TextBrush;
         }
     }
 
     private static void ApplyDarkThemeToInline(System.Windows.Documents.Inline inline)
     {
-        inline.Foreground = new SolidColorBrush(Color.FromArgb(0xE0, 0xFF, 0xFF, 0xFF));
+        inline.Foreground = TextBrush;
 
-        // Bold: pure white
         if (inline is System.Windows.Documents.Bold bold)
         {
-            bold.Foreground = new SolidColorBrush(Colors.White);
+            bold.Foreground = WhiteBrush;
             foreach (var child in bold.Inlines)
                 ApplyDarkThemeToInline(child);
         }
-        // Italic: slightly tinted
         else if (inline is System.Windows.Documents.Italic italic)
         {
-            italic.Foreground = new SolidColorBrush(Color.FromArgb(0xD0, 0xCC, 0xDD, 0xFF));
+            italic.Foreground = ItalicBrush;
             foreach (var child in italic.Inlines)
                 ApplyDarkThemeToInline(child);
         }
-        // Inline code: light cyan
         else if (inline is System.Windows.Documents.Run run && run.Background != null)
         {
-            run.Foreground = new SolidColorBrush(Color.FromArgb(0xFF, 0xA0, 0xE0, 0xFF));
-            run.Background = new SolidColorBrush(Color.FromArgb(0x30, 0xFF, 0xFF, 0xFF));
+            run.Foreground = CodeFgBrush;
+            run.Background = CodeBgBrush;
         }
         else if (inline is System.Windows.Documents.Span span)
         {

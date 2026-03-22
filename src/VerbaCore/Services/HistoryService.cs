@@ -12,11 +12,11 @@ public sealed class HistoryService
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
-        WriteIndented = true,
+        WriteIndented = false,
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase
     };
 
-    private const int MaxItems = 500;
+    private const int MaxItems = 200;
     private LookupHistory _history = new();
 
     public IReadOnlyList<LookupHistoryItem> Items => _history.Items.AsReadOnly();
