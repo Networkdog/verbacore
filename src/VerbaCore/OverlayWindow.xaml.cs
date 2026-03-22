@@ -72,6 +72,13 @@ public partial class OverlayWindow : Window
         _capsLockService.BufferChanged += OnBufferChanged;
         _capsLockService.EnterPressed += OnEnterPressed;
 
+        // Close overlay when it loses focus (user clicked outside)
+        Deactivated += (_, _) =>
+        {
+            if (_isShown)
+                HideOverlay();
+        };
+
         // Handle Tab key for mode switching (in the keyboard hook)
         PreviewKeyDown += (_, e) =>
         {
