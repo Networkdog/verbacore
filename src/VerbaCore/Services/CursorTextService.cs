@@ -6,6 +6,38 @@ namespace VerbaCore.Services;
 
 public sealed class CursorTextService
 {
+    /// <summary>
+    /// Gets the currently selected (highlighted) text from the focused application
+    /// using UI Automation. Does not use the clipboard.
+    /// </summary>
+    public string? GetSelectedText()
+    {
+        try
+        {
+            var focused = AutomationElement.FocusedElement;
+            if (focused == null) return null;
+
+            // Try TextPattern (richest — works in browsers, editors, Office)
+            if (focused.TryGetCurrentPattern(TextPattern.Pattern, out var tpObj)
+                && tpObj is TextPattern tp)
+            {
+                var selection = tp.GetSelection();
+                if (selection.Length > 0)
+                {
+                    var text = selection[0].GetText(2000).Trim();
+                    if (!string.IsNullOrEmpty(text))
+                        return text;
+                }
+            }
+
+            return null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     public string? GetTextUnderCursor()
     {
         try

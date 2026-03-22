@@ -17,6 +17,7 @@ public partial class OverlayWindow : Window
     private readonly SettingsService _settingsService;
     private readonly HistoryService _historyService;
     private readonly CapsLockService _capsLockService;
+    private readonly CursorTextService _cursorTextService;
 
     private readonly DispatcherTimer _cursorBlinkTimer;
     private readonly DispatcherTimer _autoHideTimer;
@@ -34,6 +35,8 @@ public partial class OverlayWindow : Window
     private bool _isShown;
     /// <summary>Set when CapsLock down opens a fresh overlay, cleared on release.</summary>
     private bool _justOpened;
+    /// <summary>Selected text grabbed from the focused app when CapsLock was pressed.</summary>
+    private string? _grabbedSelectedText;
 
     private static readonly MarkdownPipeline MarkdownPipeline = new MarkdownPipelineBuilder()
         .UseSupportedExtensions()
@@ -62,12 +65,14 @@ public partial class OverlayWindow : Window
         IOpenAiService openAiService,
         SettingsService settingsService,
         HistoryService historyService,
-        CapsLockService capsLockService)
+        CapsLockService capsLockService,
+        CursorTextService cursorTextService)
     {
         _openAiService = openAiService;
         _settingsService = settingsService;
         _historyService = historyService;
         _capsLockService = capsLockService;
+        _cursorTextService = cursorTextService;
 
         InitializeComponent();
 
@@ -178,8 +183,11 @@ public partial class OverlayWindow : Window
             _cts?.Cancel();
             _autoHideTimer.Stop();
 
+            // Grab selected text from the previously focused app BEFORE we steal focus
+            _grabbedSelectedText = _cursorTextService.GetSelectedText();
+
             // Reset UI for new input
-            InputDisplay.Text = "";
+            InputDisplay.Text = _grabbedSelectedText ?? "";
             InputDisplay.Visibility = Visibility.Visible;
             InputTextBox.Text = "";
             InputTextBox.Visibility = Visibility.Collapsed;
@@ -229,7 +237,7 @@ public partial class OverlayWindow : Window
                 // Switch to TextBox UI
                 InputDisplay.Text = "";
                 InputDisplay.Visibility = Visibility.Collapsed;
-                InputTextBox.Text = "";
+                InputTextBox.Text = _grabbedSelectedText ?? "";
                 InputTextBox.Visibility = Visibility.Visible;
                 BlinkingCursor.Visibility = Visibility.Collapsed;
                 ResultViewer.Document = new FlowDocument();
@@ -249,6 +257,9 @@ public partial class OverlayWindow : Window
                 {
                     InputTextBox.Focus();
                     System.Windows.Input.Keyboard.Focus(InputTextBox);
+                    // Select all so typing replaces the pre-filled text
+                    if (!string.IsNullOrEmpty(InputTextBox.Text))
+                        InputTextBox.SelectAll();
                 });
             }
         });
@@ -269,6 +280,10 @@ public partial class OverlayWindow : Window
             HintLabel.Visibility = Visibility.Collapsed;
 
             var input = _capsLockService.Buffer.Trim();
+            // If no typed input, fall back to grabbed selected text
+            if (string.IsNullOrEmpty(input))
+                input = _grabbedSelectedText?.Trim() ?? string.Empty;
+
             if (string.IsNullOrEmpty(input))
             {
                 HideOverlay();

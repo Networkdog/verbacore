@@ -70,7 +70,8 @@ public partial class App : Application
             GetService<IOpenAiService>(),
             settings,
             history,
-            _capsLockService);
+            _capsLockService,
+            GetService<CursorTextService>());
 
         // Install CapsLock hook
         _capsLockService.Install();

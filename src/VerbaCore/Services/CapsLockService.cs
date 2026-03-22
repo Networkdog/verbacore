@@ -53,9 +53,6 @@ public sealed class CapsLockService : IDisposable
 
     public void Install()
     {
-        // Force CapsLock OFF at startup so users don't get stuck in uppercase
-        NativeMethods.ToggleCapsLockOff();
-
         _hookProc = HookCallback;
         using var process = Process.GetCurrentProcess();
         using var module = process.MainModule!;
@@ -64,6 +61,10 @@ public sealed class CapsLockService : IDisposable
             _hookProc,
             NativeMethods.GetModuleHandle(module.ModuleName),
             0);
+
+        // Force CapsLock OFF after hook is installed
+        // The hook filters injected keys, so this simulated press will pass through
+        NativeMethods.ToggleCapsLockOff();
     }
 
     public void ClearBuffer()
@@ -85,9 +86,9 @@ public sealed class CapsLockService : IDisposable
             if (vkCode == NativeMethods.VK_CAPITAL)
             {
                 // If this is a simulated keypress (from our ToggleCapsLockOff),
-                // just suppress it without triggering overlay events.
+                // let it pass through to the OS so it actually toggles CapsLock off.
                 if (isInjected)
-                    return (IntPtr)1;
+                    return NativeMethods.CallNextHookEx(_hookId, nCode, wParam, lParam);
 
                 if (msg is NativeMethods.WM_KEYDOWN or NativeMethods.WM_SYSKEYDOWN)
                 {
