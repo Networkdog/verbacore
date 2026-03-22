@@ -50,10 +50,6 @@ public partial class OverlayWindow : Window
     private static readonly SolidColorBrush CodeBgBrush = CreateFrozenBrush(0x30, 0xFF, 0xFF, 0xFF);
     private static readonly FontFamily AppFontFamily = new("AppleSDGothicNeoR00, Segoe UI");
 
-    // Reusable FlowDocument for plain text streaming
-    private FlowDocument? _plainTextDoc;
-    private Run? _plainTextRun;
-
     private static SolidColorBrush CreateFrozenBrush(byte a, byte r, byte g, byte b)
     {
         var brush = new SolidColorBrush(Color.FromArgb(a, r, g, b));
