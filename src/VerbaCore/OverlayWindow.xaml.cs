@@ -450,11 +450,27 @@ public partial class OverlayWindow : Window
 
     private void ShowOverlay()
     {
-        // Size to screen
-        var screen = SystemParameters.PrimaryScreenWidth;
-        Width = Math.Min(700, screen * 0.5);
-        Left = (screen - Width) / 2;
-        Top = SystemParameters.PrimaryScreenHeight * 0.25;
+        var screenW = SystemParameters.PrimaryScreenWidth;
+        var screenH = SystemParameters.PrimaryScreenHeight;
+        Width = Math.Min(700, screenW * 0.5);
+        Height = 600;
+
+        var pos = _settingsService.Current.PopupPosition;
+        var margin = 20.0;
+
+        Left = pos switch
+        {
+            OverlayPosition.TopLeft or OverlayPosition.CenterLeft or OverlayPosition.BottomLeft => margin,
+            OverlayPosition.TopRight or OverlayPosition.CenterRight or OverlayPosition.BottomRight => screenW - Width - margin,
+            _ => (screenW - Width) / 2
+        };
+
+        Top = pos switch
+        {
+            OverlayPosition.TopLeft or OverlayPosition.TopCenter or OverlayPosition.TopRight => margin,
+            OverlayPosition.BottomLeft or OverlayPosition.BottomCenter or OverlayPosition.BottomRight => screenH - Height - margin - 40,
+            _ => (screenH - Height) / 2
+        };
 
         _isShown = true;
 

@@ -43,6 +43,9 @@ public partial class SettingsViewModel : ObservableObject
     private string _selectedTheme = "System";
 
     [ObservableProperty]
+    private string _popupPosition = "가운데";
+
+    [ObservableProperty]
     private string _globalHotkey = "Ctrl+Alt+V";
 
     [ObservableProperty]
@@ -51,6 +54,12 @@ public partial class SettingsViewModel : ObservableObject
     public string[] AvailableProviders { get; } = ["OpenAI", "Azure OpenAI"];
     public string[] AvailableReasoningEfforts { get; } = ["none", "minimal", "low", "medium", "high", "xhigh"];
     public string[] AvailableThemes { get; } = ["System", "Light", "Dark"];
+    public string[] AvailablePositions { get; } =
+    [
+        "왼쪽 위", "위 가운데", "오른쪽 위",
+        "왼쪽 가운데", "가운데", "오른쪽 가운데",
+        "왼쪽 아래", "아래 가운데", "오른쪽 아래"
+    ];
 
     public SettingsViewModel(SettingsService settingsService)
     {
@@ -78,6 +87,18 @@ public partial class SettingsViewModel : ObservableObject
             ThemeMode.Dark => "Dark",
             _ => "System"
         };
+        PopupPosition = s.PopupPosition switch
+        {
+            OverlayPosition.TopLeft => "왼쪽 위",
+            OverlayPosition.TopCenter => "위 가운데",
+            OverlayPosition.TopRight => "오른쪽 위",
+            OverlayPosition.CenterLeft => "왼쪽 가운데",
+            OverlayPosition.CenterRight => "오른쪽 가운데",
+            OverlayPosition.BottomLeft => "왼쪽 아래",
+            OverlayPosition.BottomCenter => "아래 가운데",
+            OverlayPosition.BottomRight => "오른쪽 아래",
+            _ => "가운데"
+        };
     }
 
     partial void OnSelectedProviderChanged(string value)
@@ -104,6 +125,18 @@ public partial class SettingsViewModel : ObservableObject
             "Light" => ThemeMode.Light,
             "Dark" => ThemeMode.Dark,
             _ => ThemeMode.System
+        };
+        s.PopupPosition = PopupPosition switch
+        {
+            "왼쪽 위" => OverlayPosition.TopLeft,
+            "위 가운데" => OverlayPosition.TopCenter,
+            "오른쪽 위" => OverlayPosition.TopRight,
+            "왼쪽 가운데" => OverlayPosition.CenterLeft,
+            "오른쪽 가운데" => OverlayPosition.CenterRight,
+            "왼쪽 아래" => OverlayPosition.BottomLeft,
+            "아래 가운데" => OverlayPosition.BottomCenter,
+            "오른쪽 아래" => OverlayPosition.BottomRight,
+            _ => OverlayPosition.CenterCenter
         };
 
         await _settingsService.SaveAsync();

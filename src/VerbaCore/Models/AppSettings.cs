@@ -21,12 +21,26 @@ public sealed class AppSettings
     public ThemeMode Theme { get; set; } = ThemeMode.System;
     public double WindowWidth { get; set; } = 520;
     public double WindowHeight { get; set; } = 680;
+    public OverlayPosition PopupPosition { get; set; } = OverlayPosition.CenterCenter;
 }
 
 public enum ApiProvider
 {
     OpenAI,
     AzureOpenAI
+}
+
+public enum OverlayPosition
+{
+    TopLeft,
+    TopCenter,
+    TopRight,
+    CenterLeft,
+    CenterCenter,
+    CenterRight,
+    BottomLeft,
+    BottomCenter,
+    BottomRight
 }
 
 public enum ThemeMode
