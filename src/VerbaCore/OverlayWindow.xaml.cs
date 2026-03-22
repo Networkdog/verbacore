@@ -417,7 +417,14 @@ public partial class OverlayWindow : Window
         Top = SystemParameters.PrimaryScreenHeight * 0.25;
 
         _isShown = true;
-        Show();
+
+        // Only call Show() once — after that, use opacity to hide/show
+        if (!IsVisible)
+        {
+            RootGrid.Opacity = 0;
+            Show();
+        }
+
         Activate();
 
         var fadeIn = new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(120));
@@ -437,7 +444,12 @@ public partial class OverlayWindow : Window
         InputDisplay.Visibility = Visibility.Visible;
 
         var fadeOut = new DoubleAnimation(1, 0, TimeSpan.FromMilliseconds(150));
-        fadeOut.Completed += (_, _) => Hide();
+        fadeOut.Completed += (_, _) =>
+        {
+            // Move off-screen instead of Hide() to avoid re-render flash
+            Left = -9999;
+            Top = -9999;
+        };
         RootGrid.BeginAnimation(OpacityProperty, fadeOut);
     }
 
