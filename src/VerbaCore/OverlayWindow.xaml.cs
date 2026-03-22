@@ -32,6 +32,8 @@ public partial class OverlayWindow : Window
     private bool _persistentMode;
     /// <summary>Whether the overlay is currently visible.</summary>
     private bool _isShown;
+    /// <summary>Set when CapsLock down opens a fresh overlay, cleared on release.</summary>
+    private bool _justOpened;
 
     private static readonly MarkdownPipeline MarkdownPipeline = new MarkdownPipelineBuilder()
         .UseSupportedExtensions()
@@ -137,11 +139,16 @@ public partial class OverlayWindow : Window
     {
         Dispatcher.Invoke(() =>
         {
-            // If in persistent mode and overlay is showing, CapsLock press is
-            // part of a quick-tap to close — don't reset the UI yet.
-            if (_persistentMode && _isShown)
+            // If overlay is already showing, mark that we did NOT just open it
+            // (so quick-tap release will close it)
+            if (_isShown)
+            {
+                _justOpened = false;
                 return;
+            }
 
+            // Opening a fresh overlay
+            _justOpened = true;
             _cts?.Cancel();
             _autoHideTimer.Stop();
 
@@ -177,9 +184,9 @@ public partial class OverlayWindow : Window
     {
         Dispatcher.Invoke(() =>
         {
-            if (_persistentMode && _isShown)
+            if (_isShown && !_justOpened)
             {
-                // Second quick tap — close the overlay
+                // Overlay was already showing before this CapsLock press — close it
                 _capsLockService.PersistentModeActive = false;
                 _persistentMode = false;
                 _cursorBlinkTimer.Stop();
@@ -187,6 +194,7 @@ public partial class OverlayWindow : Window
             }
             else
             {
+                _justOpened = false;
                 // First quick tap — enter persistent mode with IME TextBox
                 _persistentMode = true;
                 _capsLockService.PersistentModeActive = false; // Don't intercept keys — let TextBox handle them

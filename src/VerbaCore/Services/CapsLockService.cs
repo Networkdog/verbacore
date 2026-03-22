@@ -120,6 +120,8 @@ public sealed class CapsLockService : IDisposable
                             LongPressReleased?.Invoke(this, EventArgs.Empty);
                         }
                     }
+                    // Always ensure CapsLock stays OFF
+                    NativeMethods.ToggleCapsLockOff();
                     return (IntPtr)1;
                 }
             }

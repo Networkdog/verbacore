@@ -20,9 +20,11 @@ public sealed class PromptBuilder
         return mode switch
         {
             LookupMode.Dictionary =>
-                "You are a top-tier linguist and etymology expert helping native Korean speakers internalize the true meanings and nuances of vocabulary. " +
-                "Go beyond traditional dictionary definitions by using storytelling, etymology, and native intuition. " +
-                "All explanations must be in natural Korean. Use markdown formatting.",
+                "You are a top-tier linguist and etymology expert helping native Korean speakers deeply understand English vocabulary. " +
+                "You explain ENGLISH words — keep the English word as-is in the heading, provide IPA for the ENGLISH pronunciation, and write all explanations in natural Korean. " +
+                "If the user inputs a Korean word, find the best matching English word and explain that English word. " +
+                "NEVER translate the input word into Korean for the heading. The heading must always show the English word in its original English form. " +
+                "Use markdown formatting.",
 
             LookupMode.Translate =>
                 "You are a professional translator. " +
@@ -41,23 +43,38 @@ public sealed class PromptBuilder
     private static string BuildDictionaryPrompt(string word, string sourceLanguage, string targetLanguage)
     {
         return $$"""
+            [Critical Rules]
+            - The heading MUST show the ENGLISH word (e.g., "neighbor", NOT "이웃").
+            - IPA must be for the ENGLISH pronunciation (e.g., /ˈneɪbər/, NOT Korean IPA).
+            - Korean pronunciation is a phonetic approximation in Hangul (e.g., 네이버).
+            - If the user inputs a Korean word, find the matching English word and explain THAT English word.
+            - All explanatory text, examples, synonyms, and antonyms must be written in Korean.
+            - Synonyms and antonyms must be ENGLISH words with Korean explanations.
+
             [Instructions]
-            1. Target Language: If the input is English, explain it in Korean. If the input is Korean, explain its English equivalent.
-            2. Storytelling Format: For the explanation section, NEVER use numbers or subtitles. Write a natural, engaging prose in 3 paragraphs or less.
-            3. Etymology & Visualization: Break down the word's anatomy (roots, prefixes, suffixes) and provide vivid visual imagery for intuitive understanding.
-            4. Plain Korean: Translate difficult Hanja-based Korean definitions into easy, everyday conversational Korean.
-            5. Native Nuances: Vividly describe the contexts, emotional tones (formal/informal, positive/negative connotations), and idiomatic usages native speakers use.
-            6. Synonyms/Antonyms: Provide at least 4 of each. Explicitly explain the subtle nuance differences compared to the main input word.
-            7. Pronunciation: Provide the IPA and the closest Korean phonetic spelling.
+            1. Storytelling Format: NEVER use numbers or subtitles in the explanation. Write natural, engaging prose in 3 paragraphs or fewer.
+            2. Etymology & Visualization: Break down the English word's roots/prefixes/suffixes. Provide vivid imagery for intuitive understanding.
+            3. Plain Korean: If you use difficult Hanja-based Korean terms, immediately rephrase them in easy everyday Korean.
+            4. Native Nuances: Describe how native English speakers actually use this word — contexts, emotional tones, formality, connotations, idioms.
+            5. Pronunciation: IPA for the English word + closest Korean phonetic spelling.
 
             [Output Template]
-            ## {Input Word} [{IPA}, {Korean Pronunciation}] {Part of Speech}. {Dictionary Definition}
+            ## {English Word} [{English IPA}, {Korean Phonetic}] {POS}. {Korean meaning}; {POS}. {Korean meaning}
 
-            (Write the storytelling explanation here in Korean based on Instructions 2-5.)
+            (3 paragraphs max of storytelling explanation in Korean. No numbers, no subtitles.)
 
             ### 활용 예시
-            * {English Sentence 1} - {Korean Translation} ({Explanation & Nuance})
-            * {English Sentence 2} - {Korean Translation} ({Explanation & Nuance})
+            * **{English sentence}** — {Korean translation} ({brief nuance note in Korean})
+            * **{English sentence}** — {Korean translation} ({brief nuance note in Korean})
+            * **{English sentence}** — {Korean translation} ({brief nuance note in Korean})
+
+            ### 유의어
+            * **{English synonym}** [{Korean phonetic}] {POS}. {Korean meaning} ({nuance difference vs input word, in Korean})
+            * (at least 4)
+
+            ### 반의어
+            * **{English antonym}** [{Korean phonetic}] {POS}. {Korean meaning} ({nuance difference vs input word, in Korean})
+            * (at least 4)
 
             [Input Word]: {{word}}
             """;
