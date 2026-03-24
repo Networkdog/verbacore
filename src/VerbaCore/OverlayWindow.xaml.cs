@@ -102,8 +102,18 @@ public partial class OverlayWindow : Window
         // Handle Tab key for mode switching (in the keyboard hook)
         PreviewKeyDown += (_, e) =>
         {
+            // Tab always switches mode regardless of state
+            if (e.Key == System.Windows.Input.Key.Tab)
+            {
+                _modeIndex = (_modeIndex + 1) % _modes.Length;
+                _currentMode = _modes[_modeIndex];
+                UpdateModeLabel();
+                e.Handled = true;
+                return;
+            }
+
             // In persistent mode, let the TextBox handle input
-            if (_persistentMode && e.Key != System.Windows.Input.Key.Tab)
+            if (_persistentMode)
                 return;
 
             // While viewing results, allow Escape to close but don't eat other keys

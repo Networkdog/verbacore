@@ -129,15 +129,15 @@
                                  VerticalAlignment="Center"
                                  Visibility="{Binding IsLoading, Converter={StaticResource BoolToVisibilityConverter}}" />
 
-                <!-- Result text -->
-                <ScrollViewer VerticalScrollBarVisibility="Auto"
-                              HorizontalScrollBarVisibility="Disabled">
-                    <TextBlock Text="{Binding ResultText}"
-                               TextWrapping="Wrap"
-                               FontSize="13"
-                               LineHeight="22"
-                               Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
-                </ScrollViewer>
+                <!-- Result text (Markdown-rendered FlowDocument) -->
+                <FlowDocumentScrollViewer x:Name="ResultViewer"
+                                          VerticalScrollBarVisibility="Auto"
+                                          HorizontalScrollBarVisibility="Disabled"
+                                          IsToolBarVisible="False"
+                                          Background="Transparent"
+                                          Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                                          FontSize="14"
+                                          FontFamily="AppleSDGothicNeoR00, Segoe UI" />
             </Grid>
         </Border>
 
