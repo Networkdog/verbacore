@@ -22,7 +22,6 @@ Compression=lzma2/ultra64
 SolidCompression=yes
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
-SetupIconFile=src\VerbaCore\Assets\verbacore.ico
 UninstallDisplayIcon={app}\{#MyAppExeName}
 WizardStyle=modern
 DisableProgramGroupPage=yes
