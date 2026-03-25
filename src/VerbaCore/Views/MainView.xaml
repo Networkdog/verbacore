@@ -35,12 +35,7 @@
                 <ui:Button Content="🔄 번역"
                            Appearance="{Binding CurrentMode, Converter={StaticResource ModeToAppearanceConverter}, ConverterParameter=Translate}"
                            Command="{Binding SetModeCommand}"
-                           CommandParameter="Translate"
-                           Margin="0,0,4,0" />
-                <ui:Button Content="📝 분석"
-                           Appearance="{Binding CurrentMode, Converter={StaticResource ModeToAppearanceConverter}, ConverterParameter=Analyze}"
-                           Command="{Binding SetModeCommand}"
-                           CommandParameter="Analyze" />
+                           CommandParameter="Translate" />
             </StackPanel>
 
             <!-- Language Swap -->

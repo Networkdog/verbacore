@@ -29,15 +29,14 @@ Most dictionary & translation apps make you **leave** what you're doing. VerbaCo
 
 ## Features
 
-### Three AI-Powered Modes
+### Two AI-Powered Modes
 
 | Mode | What it does |
 |------|-------------|
 | 📖 **Dictionary** | Deep word lookup with etymology storytelling, IPA pronunciation, synonyms/antonyms, and usage examples |
 | 🔄 **Translate** | Context-aware translation with nuance notes, formality levels, and alternatives |
-| 📝 **Analyze** | Grammar breakdown — parts of speech, tense/voice analysis, sentence structure, idioms |
 
-Press **Tab** to cycle between modes on the fly.
+**Smart auto-selection**: The mode is chosen automatically based on input length — short input (≤3 words) defaults to Dictionary, longer input defaults to Translate. Press **Tab** to override manually.
 
 ### Multiple Input Methods
 

@@ -93,6 +93,9 @@ public partial class MainViewModel : ObservableObject
             return;
         }
 
+        // Auto-select mode based on input length
+        CurrentMode = PromptBuilder.AutoSelectMode(input);
+
         // Cancel any previous request
         _cts?.Cancel();
         _cts = new CancellationTokenSource();
@@ -151,7 +154,6 @@ public partial class MainViewModel : ObservableObject
         {
             "Dictionary" => LookupMode.Dictionary,
             "Translate" => LookupMode.Translate,
-            "Analyze" => LookupMode.Analyze,
             _ => LookupMode.Dictionary
         };
     }

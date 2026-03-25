@@ -4,13 +4,21 @@ namespace VerbaCore.Services;
 
 public sealed class PromptBuilder
 {
+    /// <summary>
+    /// Auto-selects Dictionary for short input (≤3 words), Translate for longer input.
+    /// </summary>
+    public static LookupMode AutoSelectMode(string input)
+    {
+        var wordCount = input.Trim().Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).Length;
+        return wordCount <= 3 ? LookupMode.Dictionary : LookupMode.Translate;
+    }
+
     public string Build(string input, LookupMode mode, string sourceLanguage, string targetLanguage)
     {
         return mode switch
         {
             LookupMode.Dictionary => BuildDictionaryPrompt(input, sourceLanguage, targetLanguage),
             LookupMode.Translate => BuildTranslatePrompt(input, sourceLanguage, targetLanguage),
-            LookupMode.Analyze => BuildAnalyzePrompt(input, sourceLanguage, targetLanguage),
             _ => BuildDictionaryPrompt(input, sourceLanguage, targetLanguage)
         };
     }
@@ -29,11 +37,6 @@ public sealed class PromptBuilder
             LookupMode.Translate =>
                 "You are a professional translator. " +
                 "Provide accurate translations with brief notes on nuances when applicable. " +
-                "Use markdown formatting for readability.",
-
-            LookupMode.Analyze =>
-                "You are a linguistic analysis expert. " +
-                "Provide detailed grammatical breakdowns with clear explanations. " +
                 "Use markdown formatting for readability.",
 
             _ => "You are a helpful language assistant."
@@ -108,36 +111,6 @@ public sealed class PromptBuilder
             (the translation text)
 
             > 💡 **참고**: (brief notes on nuances, formality level, or alternative translations if applicable)
-            """;
-    }
-
-    private static string BuildAnalyzePrompt(string text, string sourceLanguage, string targetLanguage)
-    {
-        return $$"""
-            Analyze the following {{sourceLanguage}} text grammatically.
-            Use rich markdown formatting: **bold** for key terms, `backticks` for linguistic labels, and blockquotes (>) for key insights.
-
-            "{{text}}"
-
-            [Output Format]
-            ## 📝 문법 분석
-
-            > 📌 **핵심 구조**: (brief sentence structure summary in {{targetLanguage}})
-
-            ### 🔍 품사 분석
-            * **{word}** — `{POS}` {explanation in {{targetLanguage}}}
-            * ...
-
-            ### ⚙️ 시제 & 태
-            (tense and voice analysis in {{targetLanguage}})
-
-            ### 💬 관용적 표현
-            (idiomatic expressions if any, explained in {{targetLanguage}} — write "없음" if none)
-
-            ---
-
-            ### 📖 의미 요약
-            (meaning summary in {{targetLanguage}})
             """;
     }
 }

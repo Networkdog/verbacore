@@ -26,7 +26,7 @@ public partial class OverlayWindow : Window
     private const int RenderThrottleMs = 200;
 
     private LookupMode _currentMode = LookupMode.Dictionary;
-    private readonly LookupMode[] _modes = [LookupMode.Dictionary, LookupMode.Translate, LookupMode.Analyze];
+    private readonly LookupMode[] _modes = [LookupMode.Dictionary, LookupMode.Translate];
     private int _modeIndex;
 
     /// <summary>Whether the overlay is in persistent (quick-tap) mode.</summary>
@@ -107,6 +107,7 @@ public partial class OverlayWindow : Window
             {
                 _modeIndex = (_modeIndex + 1) % _modes.Length;
                 _currentMode = _modes[_modeIndex];
+                _userExplicitlySetMode = true;
                 UpdateModeLabel();
                 e.Handled = true;
                 return;
@@ -168,6 +169,7 @@ public partial class OverlayWindow : Window
             e.Handled = true;
             _modeIndex = (_modeIndex + 1) % _modes.Length;
             _currentMode = _modes[_modeIndex];
+            _userExplicitlySetMode = true;
             UpdateModeLabel();
         }
     }
@@ -340,6 +342,7 @@ public partial class OverlayWindow : Window
             {
                 _modeIndex = (_modeIndex + 1) % _modes.Length;
                 _currentMode = _modes[_modeIndex];
+                _userExplicitlySetMode = true;
                 UpdateModeLabel();
                 // Remove tab from buffer by clearing and re-setting
                 _capsLockService.ClearBuffer();
@@ -357,7 +360,6 @@ public partial class OverlayWindow : Window
         {
             LookupMode.Dictionary => "📖 사전",
             LookupMode.Translate => "🔄 번역",
-            LookupMode.Analyze => "📝 분석",
             _ => "📖 사전"
         };
 
@@ -374,6 +376,8 @@ public partial class OverlayWindow : Window
         BlinkingCursor.Margin = new Thickness(Math.Min(textWidth + 2, ActualWidth - 100), 0, 0, 8);
     }
 
+    private bool _userExplicitlySetMode;
+
     private async Task PerformLookupAsync(string input)
     {
         if (string.IsNullOrEmpty(_settingsService.Current.ApiKey))
@@ -381,6 +385,14 @@ public partial class OverlayWindow : Window
             StatusLabel.Text = "⚠ API Key가 설정되지 않았습니다. 트레이 아이콘 → 설정";
             _autoHideTimer.Start();
             return;
+        }
+
+        // Auto-select mode based on input length if user hasn't explicitly switched
+        if (!_userExplicitlySetMode)
+        {
+            _currentMode = PromptBuilder.AutoSelectMode(input);
+            _modeIndex = _currentMode == LookupMode.Dictionary ? 0 : 1;
+            UpdateModeLabel();
         }
 
         _cts?.Cancel();
@@ -499,6 +511,7 @@ public partial class OverlayWindow : Window
         _cursorBlinkTimer.Stop();
         _isShown = false;
         _persistentMode = false;
+        _userExplicitlySetMode = false;
         _capsLockService.PersistentModeActive = false;
 
         // Reset TextBox/TextBlock visibility
