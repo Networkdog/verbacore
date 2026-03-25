@@ -63,7 +63,6 @@ public sealed class SettingsService
             SourceLanguage = _current.SourceLanguage,
             TargetLanguage = _current.TargetLanguage,
             GlobalHotkey = _current.GlobalHotkey,
-            ClipboardMonitorEnabled = _current.ClipboardMonitorEnabled,
             StartWithWindows = _current.StartWithWindows,
             Theme = _current.Theme,
             WindowWidth = _current.WindowWidth,

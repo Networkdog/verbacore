@@ -16,7 +16,6 @@ public partial class App : Application
     private SettingsWindow? _settingsWindow;
     private OverlayWindow? _overlayWindow;
     private CapsLockService? _capsLockService;
-    private ClipboardMonitorService? _clipboardService;
 
     public static T GetService<T>() where T : notnull => Services.GetRequiredService<T>();
 
@@ -29,7 +28,6 @@ public partial class App : Application
         services.AddSingleton<HistoryService>();
         services.AddSingleton<PromptBuilder>();
         services.AddSingleton<CapsLockService>();
-        services.AddSingleton<ClipboardMonitorService>();
         services.AddSingleton<SpeechInputService>();
         services.AddSingleton<CursorTextService>();
         services.AddHttpClient<IOpenAiService, OpenAiService>(client =>
@@ -79,36 +77,6 @@ public partial class App : Application
         // Set up system tray icon
         SetupTrayIcon();
 
-        // Start clipboard monitoring if enabled
-        if (settings.Current.ClipboardMonitorEnabled)
-        {
-            _clipboardService = GetService<ClipboardMonitorService>();
-            var clipboardHelper = new Window
-            {
-                Width = 1, Height = 1,
-                WindowStyle = System.Windows.WindowStyle.None,
-                AllowsTransparency = true,
-                Opacity = 0,
-                ShowInTaskbar = false,
-                ShowActivated = false
-            };
-            clipboardHelper.Show();
-            _clipboardService.Start(clipboardHelper);
-            _clipboardService.ClipboardTextChanged += OnClipboardTextChanged;
-        }
-    }
-
-    private void OnClipboardTextChanged(object? sender, string text)
-    {
-        // Show overlay with clipboard text
-        _overlayWindow?.Dispatcher.Invoke(() =>
-        {
-            if (_overlayWindow != null)
-            {
-                _capsLockService?.ClearBuffer();
-                // Directly trigger lookup via overlay
-            }
-        });
     }
 
     private void SetupTrayIcon()
@@ -154,7 +122,6 @@ public partial class App : Application
     private void ExitApp()
     {
         _capsLockService?.Dispose();
-        _clipboardService?.Dispose();
         _trayIcon?.Dispose();
         _overlayWindow?.Close();
         _settingsWindow?.Close();

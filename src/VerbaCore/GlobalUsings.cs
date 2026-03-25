@@ -5,7 +5,6 @@ global using MessageBox = System.Windows.MessageBox;
 global using MessageBoxButton = System.Windows.MessageBoxButton;
 global using MessageBoxImage = System.Windows.MessageBoxImage;
 global using KeyEventArgs = System.Windows.Input.KeyEventArgs;
-global using Clipboard = System.Windows.Clipboard;
 global using Point = System.Windows.Point;
 global using Size = System.Windows.Size;
 global using Color = System.Windows.Media.Color;

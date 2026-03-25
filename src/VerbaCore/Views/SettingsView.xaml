@@ -96,21 +96,6 @@
                 </Grid>
             </ui:Card>
 
-            <ui:Card Margin="0,0,0,8">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                        <TextBlock Text="클립보드 감시" FontSize="13" />
-                        <TextBlock Text="텍스트 복사 시 자동으로 조회합니다" FontSize="11" Opacity="0.6" />
-                    </StackPanel>
-                    <ui:ToggleSwitch Grid.Column="1"
-                                     IsChecked="{Binding ClipboardMonitorEnabled}" />
-                </Grid>
-            </ui:Card>
-
             <!-- Appearance -->
             <TextBlock Text="외관" FontSize="16" FontWeight="SemiBold" Margin="0,16,0,12" />
 

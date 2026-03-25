@@ -32,11 +32,60 @@
 
 ## 빌드 & 실행
 
+### 필수 조건
+
+- [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
+- Windows 7 이상 (WPF 앱)
+
+### Debug 빌드
+
 ```bash
-cd src/VerbaCore
-dotnet build
-dotnet run
+dotnet build src/VerbaCore/VerbaCore.csproj
+dotnet run --project src/VerbaCore/VerbaCore.csproj
 ```
+
+### Release 빌드
+
+```bash
+dotnet build src/VerbaCore/VerbaCore.csproj -c Release
+```
+
+출력 경로: `src/VerbaCore/bin/Release/net8.0-windows7.0/`
+
+## Installer 패키징
+
+### 필수 조건
+
+- [Inno Setup 6](https://jrsoftware.org/isdl.php) 설치
+- Release 빌드 완료
+
+### 1단계: Self-Contained 단일 실행 파일 발행
+
+```bash
+dotnet publish src/VerbaCore/VerbaCore.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o publish-standalone
+```
+
+이 명령은 .NET 런타임을 포함한 단일 `VerbaCore.exe` 파일을 `publish-standalone/` 폴더에 생성합니다.
+
+### 2단계: Inno Setup으로 설치 파일 생성
+
+```bash
+iscc installer.iss
+```
+
+또는 Inno Setup GUI에서 `installer.iss`를 열고 **Compile**을 실행합니다.
+
+생성된 설치 파일: `installer-output/VerbaCore-Setup-1.0.0.exe`
+
+### Installer 옵션
+
+| 옵션 | 설명 |
+|------|------|
+| 설치 경로 | `%LocalAppData%\Programs\VerbaCore` (사용자별, 관리자 권한 불필요) |
+| 바탕화면 바로가기 | 선택 가능 (기본: 해제) |
+| 시작 시 자동 실행 | 선택 가능 (레지스트리 `HKCU\...\Run` 등록) |
+| 언어 | 한국어, 영어 |
+| 제거 | 프로그램 제거 시 `%LocalAppData%\VerbaCore` 데이터도 함께 삭제 |
 
 ## 설정
 

@@ -4,17 +4,6 @@ namespace VerbaCore.Helpers;
 
 internal static class NativeMethods
 {
-    // Clipboard monitoring
-    [DllImport("user32.dll", SetLastError = true)]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    public static extern bool AddClipboardFormatListener(IntPtr hwnd);
-
-    [DllImport("user32.dll", SetLastError = true)]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    public static extern bool RemoveClipboardFormatListener(IntPtr hwnd);
-
-    public const int WM_CLIPBOARDUPDATE = 0x031D;
-
     // Cursor position
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
