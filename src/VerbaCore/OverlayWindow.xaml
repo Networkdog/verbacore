@@ -118,8 +118,9 @@
                               Margin="0,8,0,0"
                               Background="Transparent"
                               Foreground="#E0FFFFFF"
-                              FontSize="20"
+                              FontSize="16"
                               FontFamily="AppleSDGothicNeoR00, Segoe UI"
+                              FontWeight="Regular"
                               IsToolBarVisible="False" />
 
                 <!-- Loading indicator -->

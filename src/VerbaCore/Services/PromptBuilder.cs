@@ -68,7 +68,7 @@ public sealed class PromptBuilder
             5. Pronunciation: IPA for the English word + closest Korean phonetic spelling, both in backticks.
 
             [Output Template]
-            ### {English Word} `/ˈIPA/` `Korean Phonetic`
+            ### `/ˈIPA/` `Korean Phonetic`
             **{POS}** {Korean meaning}; **{POS}** {Korean meaning}
 
             > 📌 **{root/prefix}** ({origin meaning}) + **{root/suffix}** ({origin meaning}): {brief origin story in Korean}

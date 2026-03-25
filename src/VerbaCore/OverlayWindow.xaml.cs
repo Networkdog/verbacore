@@ -551,7 +551,7 @@ public partial class OverlayWindow : Window
         var doc = new FlowDocument(para)
         {
             Foreground = TextBrush,
-            FontSize = 20,
+            FontSize = 16,
             FontFamily = AppFontFamily,
             PagePadding = new Thickness(0)
         };
@@ -563,7 +563,7 @@ public partial class OverlayWindow : Window
     /// </summary>
     private static void ApplyDarkThemeToDocument(FlowDocument doc)
     {
-        var baseFontSize = 20.0;
+        var baseFontSize = 16.0;
         doc.Foreground = TextBrush;
         doc.FontSize = baseFontSize;
         doc.FontFamily = AppFontFamily;
