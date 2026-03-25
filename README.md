@@ -1,103 +1,184 @@
-# VerbaCore
+<p align="center">
+  <h1 align="center">VerbaCore</h1>
+  <p align="center">
+    <strong>AI-powered dictionary, translator & grammar analyzer — always one keystroke away.</strong>
+  </p>
+  <p align="center">
+    <a href="https://github.com/Networkdog/verbacore/releases"><img src="https://img.shields.io/github/v/release/Networkdog/verbacore?style=flat-square" alt="Release"></a>
+    <a href="https://github.com/Networkdog/verbacore/blob/main/LICENSE"><img src="https://img.shields.io/github/license/Networkdog/verbacore?style=flat-square" alt="License"></a>
+    <img src="https://img.shields.io/badge/platform-Windows-blue?style=flat-square" alt="Platform">
+    <img src="https://img.shields.io/badge/.NET-8.0-purple?style=flat-square" alt=".NET 8">
+  </p>
+</p>
 
-**경량 AI 사전 & 번역 앱** — Windows 데스크탑용
+---
 
-단어나 문장을 입력하면 OpenAI API를 통해 **사전 조회**, **번역**, **문법 분석** 결과를 실시간 스트리밍으로 표시합니다.
+VerbaCore lives in your system tray and activates instantly with **CapsLock** or a global hotkey. Type a word or sentence, release the key, and get AI-powered results streamed in real time — no browser, no tab switching, no friction.
 
-## 주요 기능
+<!-- TODO: Add a GIF demo here -->
+<!-- ![VerbaCore Demo](docs/demo.gif) -->
 
-- **3가지 조회 모드**: 사전 (정의/발음/예문), 번역, 문법 분석
-- **5가지 입력 방식**:
-  - ⌨️ 키보드 직접 입력
-  - 🔥 글로벌 단축키 (Ctrl+Alt+V)로 어디서나 빠른 실행
-  - 🎤 음성 입력 (마이크)
-  - 🖱 마우스 커서 아래 텍스트 자동 추출
-  - 📋 클립보드 감시 (텍스트 복사 시 자동 조회)
-- **Windows 11 Mica 배경**: 반투명 유리 효과의 현대적 UI
-- **다크/라이트 테마**: 시스템 설정 연동
-- **다국어 지원**: 영어, 한국어, 일본어, 중국어 등 15개 언어
-- **조회 히스토리**: 이전 조회 기록 검색 및 재조회
-- **API Key 보안**: DPAPI 암호화 저장
+## Why VerbaCore?
 
-## 기술 스택
+Most dictionary & translation apps make you **leave** what you're doing. VerbaCore is designed to be **invisible until you need it** — then it appears, answers, and gets out of the way.
 
-| 구성요소 | 기술 |
-|----------|------|
-| 언어 | C# 12 / .NET 8 |
-| UI | WPF + WPF-UI (Fluent Design) |
-| AI | OpenAI GPT-4o-mini / GPT-4o |
-| 아키텍처 | MVVM (CommunityToolkit.Mvvm) |
-| 단축키 | NHotkey.Wpf |
-| 음성 | System.Speech.Recognition |
+- **Zero-friction activation** — Hold CapsLock, type, release. That's it.
+- **Real-time streaming** — Results appear word-by-word as the AI generates them.
+- **No accidental CAPS LOCK** — The hook forces CapsLock off, so your text stays clean.
+- **Lightweight** — Single-file executable, ~60 MB, minimal memory footprint.
 
-## 빌드 & 실행
+## Features
 
-### 필수 조건
+### Three AI-Powered Modes
 
-- [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
-- Windows 7 이상 (WPF 앱)
+| Mode | What it does |
+|------|-------------|
+| 📖 **Dictionary** | Deep word lookup with etymology storytelling, IPA pronunciation, synonyms/antonyms, and usage examples |
+| 🔄 **Translate** | Context-aware translation with nuance notes, formality levels, and alternatives |
+| 📝 **Analyze** | Grammar breakdown — parts of speech, tense/voice analysis, sentence structure, idioms |
 
-### Debug 빌드
+Press **Tab** to cycle between modes on the fly.
+
+### Multiple Input Methods
+
+| Method | How |
+|--------|-----|
+| ⌨️ CapsLock Hold | Hold CapsLock → type → release to look up (Enso-style large text overlay) |
+| ⌨️ CapsLock Tap | Quick-tap CapsLock to open a persistent input box with full IME support |
+| 🔥 Global Hotkey | `Ctrl+Alt+V` (customizable) to activate from any app |
+| 🎤 Voice Input | Click the mic button — speaks and auto-looks up |
+| 🖱️ Cursor Text | Automatically grabs selected text under your cursor via UI Automation |
+
+### 15 Languages Supported
+
+English, Korean, Japanese, Chinese (Simplified & Traditional), Spanish, French, German, Portuguese, Russian, Arabic, Italian, Dutch, Vietnamese, Thai, Indonesian
+
+### More
+
+- 🌙 **Dark / Light / System theme** with Fluent Design (WPF-UI)
+- 📋 **Lookup history** — searchable, re-queryable, persisted across sessions (up to 200 items)
+- 🔐 **Secure API key storage** — encrypted with Windows DPAPI (machine + user scoped)
+- 📍 **9-point popup positioning** — place the overlay at any corner, edge, or center
+- 🚀 **Start with Windows** — optional auto-launch at login
+- 🧠 **Reasoning model support** — works with GPT-4o, GPT-4o-mini, o1, o3 with configurable thinking effort
+
+## Quick Start
+
+### Option 1: Download the Installer
+
+1. Go to [**Releases**](https://github.com/Networkdog/verbacore/releases)
+2. Download `VerbaCore-Setup-x.x.x.exe` (installer) or `VerbaCore-x.x.x-portable.zip` (portable)
+3. Run → enter your [OpenAI API key](https://platform.openai.com/api-keys) in Settings
+4. Hold **CapsLock**, type a word, release — done!
+
+### Option 2: Build from Source
+
+**Prerequisites**: [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0), Windows 7+
 
 ```bash
-dotnet build src/VerbaCore/VerbaCore.csproj
+git clone https://github.com/Networkdog/verbacore.git
+cd verbacore
 dotnet run --project src/VerbaCore/VerbaCore.csproj
 ```
 
-### Release 빌드
+## Configuration
+
+Open **Settings** by double-clicking the system tray icon or right-clicking → ⚙ Settings.
+
+| Setting | Default | Notes |
+|---------|---------|-------|
+| Provider | OpenAI | Also supports Azure OpenAI |
+| Model | `gpt-4o-mini` | Cost-effective; switch to `gpt-4o` for higher quality |
+| Global Hotkey | `Ctrl+Alt+V` | Customizable (e.g. `Shift+F12`, `Win+Z`) |
+| Theme | Dark | Dark / Light / System |
+| Popup Position | Center | 9-point grid: corners, edges, center |
+| Start with Windows | Off | Adds to `HKCU\...\Run` registry |
+
+### Azure OpenAI
+
+VerbaCore also supports Azure OpenAI Service — just switch the provider toggle and fill in your endpoint, deployment name, and API version.
+
+## Tech Stack
+
+| Component | Technology |
+|-----------|-----------|
+| Language | C# 12 / .NET 8 |
+| UI Framework | WPF + [WPF-UI](https://github.com/lepoco/wpfui) (Fluent Design) |
+| AI Backend | OpenAI / Azure OpenAI (streaming SSE) |
+| Architecture | MVVM ([CommunityToolkit.Mvvm](https://github.com/CommunityToolkit/dotnet)) |
+| Markdown | [Markdig.Wpf](https://github.com/Kryptos-FR/markdig.wpf) |
+| Hotkeys | [NHotkey.Wpf](https://github.com/thomaslevesque/NHotkey) |
+| Speech | System.Speech.Recognition |
+| Installer | [Inno Setup](https://jrsoftware.org/isinfo.php) |
+| CI/CD | GitHub Actions (auto-release on tag push) |
+
+## Building the Installer
 
 ```bash
-dotnet build src/VerbaCore/VerbaCore.csproj -c Release
-```
+# 1. Publish self-contained single-file executable
+dotnet publish src/VerbaCore/VerbaCore.csproj -c Release -r win-x64 ^
+  --self-contained true -p:PublishSingleFile=true ^
+  -p:IncludeNativeLibrariesForSelfExtract=true -o publish-standalone
 
-출력 경로: `src/VerbaCore/bin/Release/net8.0-windows7.0/`
-
-## Installer 패키징
-
-### 필수 조건
-
-- [Inno Setup 6](https://jrsoftware.org/isdl.php) 설치
-- Release 빌드 완료
-
-### 1단계: Self-Contained 단일 실행 파일 발행
-
-```bash
-dotnet publish src/VerbaCore/VerbaCore.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o publish-standalone
-```
-
-이 명령은 .NET 런타임을 포함한 단일 `VerbaCore.exe` 파일을 `publish-standalone/` 폴더에 생성합니다.
-
-### 2단계: Inno Setup으로 설치 파일 생성
-
-```bash
+# 2. Build installer (requires Inno Setup 6)
 iscc installer.iss
 ```
 
-또는 Inno Setup GUI에서 `installer.iss`를 열고 **Compile**을 실행합니다.
+Output: `installer-output/VerbaCore-Setup-x.x.x.exe`
 
-생성된 설치 파일: `installer-output/VerbaCore-Setup-1.0.0.exe`
+> **Tip**: Just push a `v*` tag to GitHub and the CI will build & publish the release automatically.
 
-### Installer 옵션
+## Project Structure
 
-| 옵션 | 설명 |
-|------|------|
-| 설치 경로 | `%LocalAppData%\Programs\VerbaCore` (사용자별, 관리자 권한 불필요) |
-| 바탕화면 바로가기 | 선택 가능 (기본: 해제) |
-| 시작 시 자동 실행 | 선택 가능 (레지스트리 `HKCU\...\Run` 등록) |
-| 언어 | 한국어, 영어 |
-| 제거 | 프로그램 제거 시 `%LocalAppData%\VerbaCore` 데이터도 함께 삭제 |
+```
+src/VerbaCore/
+├── App.xaml.cs              # Entry point, DI container, tray icon
+├── OverlayWindow.xaml.cs    # Frameless Enso-style overlay (CapsLock UI)
+├── Services/
+│   ├── OpenAiService.cs     # Streaming HTTP client for OpenAI/Azure
+│   ├── CapsLockService.cs   # Low-level keyboard hook
+│   ├── PromptBuilder.cs     # Mode-specific prompt engineering
+│   ├── SettingsService.cs   # JSON persistence + DPAPI encryption
+│   ├── HistoryService.cs    # Lookup history (200 items max)
+│   ├── SpeechInputService.cs # System.Speech wrapper
+│   └── CursorTextService.cs # UI Automation text extraction
+├── ViewModels/              # MVVM ViewModels
+├── Views/                   # WPF UserControls
+├── Models/                  # Data models
+└── Helpers/                 # P/Invoke, value converters
+```
 
-## 설정
+## Contributing
 
-첫 실행 후 **⚙ 설정** 탭에서 OpenAI API Key를 입력하세요.
+Contributions are welcome! Here are some ideas:
 
-- API Key: [OpenAI Platform](https://platform.openai.com/api-keys)에서 발급
-- 기본 모델: `gpt-4o-mini` (비용 효율적)
-- 기본 단축키: `Ctrl+Alt+V`
+- 🌍 **More languages** — add prompt templates for new language pairs
+- 🎨 **Custom themes** — accent colors, font customization
+- 📚 **Offline dictionaries** — local dictionary fallback when API is unavailable
+- 🔌 **Plugin system** — support for other AI providers (Anthropic, Gemini, local LLMs)
+- 🖼️ **Screenshots & GIFs** — help make this README shine
+- 🐛 **Bug reports** — open an issue with reproduction steps
+- 📖 **Documentation** — usage guides, tutorials, translations
 
-## 스크린샷
+### How to Contribute
 
-*(추후 추가)*
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## License
+
+This project is open source. See the [LICENSE](LICENSE) file for details.
+
+## Acknowledgments
+
+- [WPF-UI](https://github.com/lepoco/wpfui) — Beautiful Fluent Design controls for WPF
+- [CommunityToolkit.Mvvm](https://github.com/CommunityToolkit/dotnet) — Modern MVVM toolkit
+- [Markdig.Wpf](https://github.com/Kryptos-FR/markdig.wpf) — Markdown rendering in WPF
+- [NHotkey](https://github.com/thomaslevesque/NHotkey) — Global hotkey management
+- [Inno Setup](https://jrsoftware.org/isinfo.php) — Windows installer framework
 
 ## 라이선스
 
