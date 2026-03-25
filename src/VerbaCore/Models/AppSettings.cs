@@ -16,7 +16,6 @@ public sealed class AppSettings
     public string SourceLanguage { get; set; } = "English";
     public string TargetLanguage { get; set; } = "Korean";
     public string GlobalHotkey { get; set; } = "Ctrl+Alt+V";
-    public bool ClipboardMonitorEnabled { get; set; } = true;
     public bool StartWithWindows { get; set; } = false;
     public ThemeMode Theme { get; set; } = ThemeMode.System;
     public double WindowWidth { get; set; } = 520;

@@ -34,9 +34,6 @@ public partial class SettingsViewModel : ObservableObject
     private bool _isAzure;
 
     [ObservableProperty]
-    private bool _clipboardMonitorEnabled = true;
-
-    [ObservableProperty]
     private bool _startWithWindows;
 
     [ObservableProperty]
@@ -78,7 +75,6 @@ public partial class SettingsViewModel : ObservableObject
         AzureEndpoint = s.AzureEndpoint;
         AzureDeploymentName = s.AzureDeploymentName;
         AzureApiVersion = s.AzureApiVersion;
-        ClipboardMonitorEnabled = s.ClipboardMonitorEnabled;
         StartWithWindows = s.StartWithWindows;
         GlobalHotkey = s.GlobalHotkey;
         SelectedTheme = s.Theme switch
@@ -117,7 +113,6 @@ public partial class SettingsViewModel : ObservableObject
         s.AzureEndpoint = AzureEndpoint;
         s.AzureDeploymentName = AzureDeploymentName;
         s.AzureApiVersion = AzureApiVersion;
-        s.ClipboardMonitorEnabled = ClipboardMonitorEnabled;
         s.StartWithWindows = StartWithWindows;
         s.GlobalHotkey = GlobalHotkey;
         s.Theme = SelectedTheme switch

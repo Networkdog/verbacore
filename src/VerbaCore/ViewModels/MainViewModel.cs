@@ -199,15 +199,6 @@ public partial class MainViewModel : ObservableObject
         (SourceLanguage, TargetLanguage) = (TargetLanguage, SourceLanguage);
     }
 
-    public void HandleClipboardText(string text)
-    {
-        Application.Current.Dispatcher.Invoke(() =>
-        {
-            InputText = text;
-            _ = LookupAsync();
-        });
-    }
-
     partial void OnSourceLanguageChanged(string value)
     {
         _settingsService.Current.SourceLanguage = value;
