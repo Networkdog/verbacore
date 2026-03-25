@@ -78,7 +78,7 @@ public partial class OverlayWindow : Window
             BlinkingCursor.Opacity = BlinkingCursor.Opacity > 0.1 ? 0 : 0.8;
 
         // Auto-hide timer (hide result after delay)
-        _autoHideTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(60) };
+        _autoHideTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(120) };
         _autoHideTimer.Tick += (_, _) =>
         {
             _autoHideTimer.Stop();
