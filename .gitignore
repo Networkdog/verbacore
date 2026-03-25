@@ -34,6 +34,11 @@ ehthumbs.db
 Desktop.ini
 .DS_Store
 
+## Build outputs
+publish/
+publish-standalone/
+installer-output/
+
 ## Misc
 *.log
 *.tmp
