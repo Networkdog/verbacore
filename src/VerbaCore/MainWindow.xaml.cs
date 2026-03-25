@@ -57,11 +57,16 @@ public partial class MainWindow : FluentWindow
 
     private void OnStateChanged(object? sender, EventArgs e)
     {
-        // Minimize to tray behavior can be added later
+        if (WindowState == WindowState.Minimized)
+        {
+            Hide();
+        }
     }
 
     private void OnClosing(object? sender, CancelEventArgs e)
     {
-        _hotkeyService.Dispose();
+        // Hide to tray instead of closing
+        e.Cancel = true;
+        Hide();
     }
 }

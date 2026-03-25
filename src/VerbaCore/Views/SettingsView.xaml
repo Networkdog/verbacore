@@ -33,10 +33,12 @@
 
             <ui:Card Margin="0,0,0,8">
                 <StackPanel>
-                    <TextBlock Text="배포 이름 (Deployment / Model)" Margin="0,0,0,4" FontSize="12" Opacity="0.7" />
-                    <ui:TextBox Text="{Binding SelectedModel, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                PlaceholderText="gpt-4o-mini" />
-                    <TextBlock Text="OpenAI: 모델 이름 (gpt-4o-mini 등) / Azure: 배포 이름" FontSize="10" Opacity="0.5" Margin="0,4,0,0" />
+                    <TextBlock Text="모델" Margin="0,0,0,4" FontSize="12" Opacity="0.7" />
+                    <ComboBox ItemsSource="{Binding AvailableModels}"
+                              SelectedItem="{Binding SelectedModel}"
+                              IsEditable="True"
+                              Text="{Binding SelectedModel, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                    <TextBlock Text="목록에서 선택하거나 직접 입력할 수 있습니다" FontSize="10" Opacity="0.5" Margin="0,4,0,0" />
                 </StackPanel>
             </ui:Card>
 
@@ -72,6 +74,18 @@
                         <TextBlock Text="API 버전" Margin="0,0,0,4" FontSize="12" Opacity="0.7" />
                         <ui:TextBox Text="{Binding AzureApiVersion, Mode=TwoWay}"
                                     PlaceholderText="2024-10-21" />
+                    </StackPanel>
+                </ui:Card>
+            </StackPanel>
+
+            <!-- Custom Endpoint Settings -->
+            <StackPanel Visibility="{Binding IsCustom, Converter={StaticResource BoolToVisibilityConverter}}">
+                <ui:Card Margin="0,0,0,8">
+                    <StackPanel>
+                        <TextBlock Text="Custom Endpoint" Margin="0,0,0,4" FontSize="12" Opacity="0.7" />
+                        <ui:TextBox Text="{Binding CustomEndpoint, Mode=TwoWay}"
+                                    PlaceholderText="http://localhost:11434 또는 https://your-server.com" />
+                        <TextBlock Text="OpenAI 호환 API 엔드포인트 (Ollama, LM Studio 등)" FontSize="10" Opacity="0.5" Margin="0,4,0,0" />
                     </StackPanel>
                 </ui:Card>
             </StackPanel>

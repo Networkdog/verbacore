@@ -1,7 +1,9 @@
 ﻿using System.Drawing;
+using System.Threading;
 using System.Windows;
 using System.Windows.Threading;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Win32;
 using VerbaCore.Models;
 using VerbaCore.Services;
 using VerbaCore.ViewModels;
@@ -12,6 +14,7 @@ namespace VerbaCore;
 public partial class App : Application
 {
     private static readonly ServiceProvider Services = ConfigureServices();
+    private static Mutex? _singleInstanceMutex;
     private System.Windows.Forms.NotifyIcon? _trayIcon;
     private SettingsWindow? _settingsWindow;
     private OverlayWindow? _overlayWindow;
@@ -30,6 +33,7 @@ public partial class App : Application
         services.AddSingleton<CapsLockService>();
         services.AddSingleton<SpeechInputService>();
         services.AddSingleton<CursorTextService>();
+        services.AddSingleton<HotkeyService>();
         services.AddHttpClient<IOpenAiService, OpenAiService>(client =>
         {
             client.Timeout = TimeSpan.FromSeconds(60);
@@ -38,6 +42,7 @@ public partial class App : Application
         });
 
         // ViewModels
+        services.AddSingleton<MainViewModel>();
         services.AddSingleton<SettingsViewModel>();
         services.AddTransient<HistoryViewModel>(sp =>
         {
@@ -50,6 +55,16 @@ public partial class App : Application
 
     protected override async void OnStartup(StartupEventArgs e)
     {
+        // Single-instance enforcement
+        _singleInstanceMutex = new Mutex(true, "VerbaCore_B3F8A2E1-7C4D-4E5A-9B2F-1A3C5D7E9F0B", out var isNew);
+        if (!isNew)
+        {
+            MessageBox.Show("VerbaCore가 이미 실행 중입니다.", "VerbaCore",
+                MessageBoxButton.OK, MessageBoxImage.Information);
+            Shutdown();
+            return;
+        }
+
         base.OnStartup(e);
 
         // Load settings & history
@@ -59,8 +74,9 @@ public partial class App : Application
         var history = GetService<HistoryService>();
         await history.LoadAsync();
 
-        // Apply theme
+        // Apply saved settings
         ApplyTheme(settings.Current.Theme);
+        ApplyStartWithWindows(settings.Current.StartWithWindows);
 
         // Create overlay window (hidden by default)
         _capsLockService = GetService<CapsLockService>();
@@ -76,7 +92,6 @@ public partial class App : Application
 
         // Set up system tray icon
         SetupTrayIcon();
-
     }
 
     private void SetupTrayIcon()
@@ -90,7 +105,7 @@ public partial class App : Application
                 "VerbaCore — 경량 AI 사전 & 번역\n\n" +
                 "CapsLock을 누른 채로 단어를 입력하세요.\n" +
                 "CapsLock을 떼면 AI가 결과를 표시합니다.\n\n" +
-                "Tab: 모드 전환 (사전/번역/분석)\n" +
+                "Tab: 모드 전환 (사전/번역)\n" +
                 "Esc: 취소\n" +
                 "Backspace: 글자 삭제",
                 "VerbaCore", MessageBoxButton.OK, MessageBoxImage.Information));
@@ -125,6 +140,8 @@ public partial class App : Application
         _trayIcon?.Dispose();
         _overlayWindow?.Close();
         _settingsWindow?.Close();
+        _singleInstanceMutex?.ReleaseMutex();
+        _singleInstanceMutex?.Dispose();
         Shutdown();
     }
 
@@ -134,9 +151,42 @@ public partial class App : Application
         {
             ThemeMode.Light => ApplicationTheme.Light,
             ThemeMode.Dark => ApplicationTheme.Dark,
-            _ => ApplicationTheme.Dark
+            _ => DetectSystemTheme()
         };
         ApplicationThemeManager.Apply(theme);
+    }
+
+    private static ApplicationTheme DetectSystemTheme()
+    {
+        try
+        {
+            using var key = Registry.CurrentUser.OpenSubKey(
+                @"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize");
+            var value = key?.GetValue("AppsUseLightTheme");
+            return value is int i && i == 1 ? ApplicationTheme.Light : ApplicationTheme.Dark;
+        }
+        catch
+        {
+            return ApplicationTheme.Dark;
+        }
+    }
+
+    public static void ApplyStartWithWindows(bool enable)
+    {
+        const string appName = "VerbaCore";
+        using var key = Registry.CurrentUser.OpenSubKey(
+            @"Software\Microsoft\Windows\CurrentVersion\Run", writable: true);
+        if (key == null) return;
+
+        if (enable)
+        {
+            var exePath = Environment.ProcessPath ?? System.Reflection.Assembly.GetExecutingAssembly().Location;
+            key.SetValue(appName, $"\"{exePath}\"");
+        }
+        else
+        {
+            key.DeleteValue(appName, throwOnMissingValue: false);
+        }
     }
 
     private void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
@@ -144,5 +194,15 @@ public partial class App : Application
         MessageBox.Show($"An error occurred:\n{e.Exception.Message}", "VerbaCore Error",
             MessageBoxButton.OK, MessageBoxImage.Error);
         e.Handled = true;
+    }
+
+    protected override void OnExit(ExitEventArgs e)
+    {
+        _capsLockService?.Dispose();
+        _trayIcon?.Dispose();
+        _singleInstanceMutex?.ReleaseMutex();
+        _singleInstanceMutex?.Dispose();
+        Services.Dispose();
+        base.OnExit(e);
     }
 }

@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using VerbaCore.Models;
@@ -40,6 +41,21 @@ public partial class HistoryViewModel : ObservableObject
     {
         if (item == null) return;
         _onRequery(item.Input, item.Mode);
+    }
+
+    [RelayCommand]
+    private async Task DeleteItemAsync(LookupHistoryItem? item)
+    {
+        if (item == null) return;
+        await _historyService.DeleteAsync(item);
+        HistoryItems.Remove(item);
+    }
+
+    [RelayCommand]
+    private static void CopyResult(LookupHistoryItem? item)
+    {
+        if (item == null) return;
+        System.Windows.Clipboard.SetText(item.Response);
     }
 
     [RelayCommand]

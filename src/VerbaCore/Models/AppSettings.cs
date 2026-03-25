@@ -13,6 +13,9 @@ public sealed class AppSettings
     public string AzureDeploymentName { get; set; } = string.Empty;
     public string AzureApiVersion { get; set; } = "2024-10-21";
 
+    // Custom/OpenAI-compatible endpoint (for OpenRouter, local LLMs, etc.)
+    public string CustomEndpoint { get; set; } = string.Empty;
+
     public string SourceLanguage { get; set; } = "English";
     public string TargetLanguage { get; set; } = "Korean";
     public string GlobalHotkey { get; set; } = "Ctrl+Alt+V";
@@ -26,7 +29,11 @@ public sealed class AppSettings
 public enum ApiProvider
 {
     OpenAI,
-    AzureOpenAI
+    AzureOpenAI,
+    Anthropic,
+    Google,
+    OpenRouter,
+    Custom
 }
 
 public enum OverlayPosition

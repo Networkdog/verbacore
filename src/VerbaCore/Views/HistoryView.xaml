@@ -86,12 +86,27 @@
                                            Text="{Binding Timestamp, StringFormat='{}{0:yyyy-MM-dd HH:mm}'}"
                                            FontSize="10"
                                            Opacity="0.4" />
-                                <ui:Button Grid.Column="1"
-                                           Content="다시 조회"
-                                           FontSize="11"
-                                           Padding="8,2"
-                                           Command="{Binding DataContext.RequeryCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
-                                           CommandParameter="{Binding}" />
+                                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                    <ui:Button Content="다시 조회"
+                                               FontSize="11"
+                                               Padding="8,2"
+                                               Command="{Binding DataContext.RequeryCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
+                                               CommandParameter="{Binding}"
+                                               Margin="0,0,4,0" />
+                                    <ui:Button Content="📋"
+                                               FontSize="11"
+                                               Padding="6,2"
+                                               ToolTip="결과 복사"
+                                               Command="{Binding DataContext.CopyResultCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
+                                               CommandParameter="{Binding}"
+                                               Margin="0,0,4,0" />
+                                    <ui:Button Content="🗑"
+                                               FontSize="11"
+                                               Padding="6,2"
+                                               ToolTip="삭제"
+                                               Command="{Binding DataContext.DeleteItemCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
+                                               CommandParameter="{Binding}" />
+                                </StackPanel>
                             </Grid>
                         </Grid>
                     </ui:Card>

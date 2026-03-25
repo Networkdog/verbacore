@@ -52,6 +52,12 @@ public sealed class HistoryService
         await SaveAsync();
     }
 
+    public async Task DeleteAsync(LookupHistoryItem item)
+    {
+        _history.Items.Remove(item);
+        await SaveAsync();
+    }
+
     private async Task SaveAsync()
     {
         Directory.CreateDirectory(HistoryDir);

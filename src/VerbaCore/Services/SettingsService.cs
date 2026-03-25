@@ -60,6 +60,7 @@ public sealed class SettingsService
             AzureEndpoint = _current.AzureEndpoint,
             AzureDeploymentName = _current.AzureDeploymentName,
             AzureApiVersion = _current.AzureApiVersion,
+            CustomEndpoint = _current.CustomEndpoint,
             SourceLanguage = _current.SourceLanguage,
             TargetLanguage = _current.TargetLanguage,
             GlobalHotkey = _current.GlobalHotkey,

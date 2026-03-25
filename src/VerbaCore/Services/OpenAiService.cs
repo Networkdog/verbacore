@@ -17,7 +17,13 @@ public interface IOpenAiService
 
 public sealed class OpenAiService : IOpenAiService
 {
-    private const string OpenAiApiUrl = "https://api.openai.com/v1/chat/completions";
+    private static readonly Dictionary<ApiProvider, string> ProviderUrls = new()
+    {
+        [ApiProvider.OpenAI] = "https://api.openai.com/v1/chat/completions",
+        [ApiProvider.Anthropic] = "https://api.anthropic.com/v1/messages",
+        [ApiProvider.Google] = "https://generativelanguage.googleapis.com/v1beta/chat/completions",
+        [ApiProvider.OpenRouter] = "https://openrouter.ai/api/v1/chat/completions",
+    };
 
     private readonly HttpClient _httpClient;
     private readonly SettingsService _settings;
@@ -30,29 +36,58 @@ public sealed class OpenAiService : IOpenAiService
         _promptBuilder = promptBuilder;
     }
 
+    private bool IsAnthropicNative => _settings.Current.Provider == ApiProvider.Anthropic;
+
     private string GetApiUrl()
     {
         var s = _settings.Current;
-        if (s.Provider == ApiProvider.AzureOpenAI)
+        return s.Provider switch
         {
-            var endpoint = s.AzureEndpoint.TrimEnd('/');
-            return $"{endpoint}/openai/deployments/{s.Model}/chat/completions?api-version={s.AzureApiVersion}";
-        }
-        return OpenAiApiUrl;
+            ApiProvider.AzureOpenAI => $"{s.AzureEndpoint.TrimEnd('/')}/openai/deployments/{s.Model}/chat/completions?api-version={s.AzureApiVersion}",
+            ApiProvider.Custom => $"{s.CustomEndpoint.TrimEnd('/')}/v1/chat/completions",
+            ApiProvider.Google => $"https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+            _ => ProviderUrls.GetValueOrDefault(s.Provider, ProviderUrls[ApiProvider.OpenAI])
+        };
     }
 
     private void ApplyAuth(HttpRequestMessage httpRequest)
     {
         var s = _settings.Current;
-        if (s.Provider == ApiProvider.AzureOpenAI)
+        switch (s.Provider)
         {
-            httpRequest.Headers.Add("api-key", s.ApiKey);
+            case ApiProvider.AzureOpenAI:
+                httpRequest.Headers.Add("api-key", s.ApiKey);
+                break;
+            case ApiProvider.Anthropic:
+                httpRequest.Headers.Add("x-api-key", s.ApiKey);
+                httpRequest.Headers.Add("anthropic-version", "2023-06-01");
+                break;
+            case ApiProvider.Google:
+                httpRequest.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                    "Bearer", s.ApiKey);
+                break;
+            default:
+                httpRequest.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                    "Bearer", s.ApiKey);
+                break;
         }
-        else
+    }
+
+    private static async Task EnsureSuccessOrThrowAsync(HttpResponseMessage response, CancellationToken ct)
+    {
+        if (response.IsSuccessStatusCode) return;
+
+        var body = await response.Content.ReadAsStringAsync(ct);
+        var statusCode = (int)response.StatusCode;
+        var message = statusCode switch
         {
-            httpRequest.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
-                "Bearer", s.ApiKey);
-        }
+            401 => $"인증 실패 (401) — API Key가 올바른지 확인해주세요.\n\n{body}",
+            403 => $"접근 거부 (403) — API Key의 권한을 확인해주세요.\n\n{body}",
+            429 => $"요청 한도 초과 (429) — 잠시 후 다시 시도해주세요.\n\n{body}",
+            >= 500 => $"서버 오류 ({statusCode}) — 잠시 후 다시 시도해주세요.\n\n{body}",
+            _ => $"API 오류 ({statusCode})\n\n{body}"
+        };
+        throw new HttpRequestException(message, null, response.StatusCode);
     }
 
     public async Task<string> GetCompletionAsync(string input, LookupMode mode,
@@ -66,7 +101,7 @@ public sealed class OpenAiService : IOpenAiService
         httpRequest.Content = new StringContent(json, Encoding.UTF8, "application/json");
 
         using var response = await _httpClient.SendAsync(httpRequest, ct);
-        response.EnsureSuccessStatusCode();
+        await EnsureSuccessOrThrowAsync(response, ct);
 
         var responseJson = await response.Content.ReadAsStringAsync(ct);
         var result = JsonSerializer.Deserialize<ChatCompletionResponse>(responseJson);
@@ -88,10 +123,10 @@ public sealed class OpenAiService : IOpenAiService
 
         using var response = await _httpClient.SendAsync(httpRequest,
             HttpCompletionOption.ResponseHeadersRead, ct);
-        response.EnsureSuccessStatusCode();
+        await EnsureSuccessOrThrowAsync(response, ct);
 
-        var responseStream = await response.Content.ReadAsStreamAsync(ct);
-        var reader = new System.IO.StreamReader(responseStream, Encoding.UTF8, false, bufferSize: 64);
+        await using var responseStream = await response.Content.ReadAsStreamAsync(ct);
+        using var reader = new System.IO.StreamReader(responseStream, Encoding.UTF8, false, bufferSize: 64);
 
         var lineBuffer = new StringBuilder();
         var charBuffer = new char[1];
@@ -157,6 +192,16 @@ public sealed class OpenAiService : IOpenAiService
             MaxTokens = isReasoning ? null : (mode == LookupMode.Dictionary ? 2048 : 4096)
         };
 
+        // Anthropic uses "max_tokens" (required) and doesn't support "system" role in messages
+        if (IsAnthropicNative)
+        {
+            request.System = request.Messages[0].Content;
+            request.Messages.RemoveAt(0);
+            request.MaxTokens = mode == LookupMode.Dictionary ? 2048 : 4096;
+            request.Temperature = null; // Anthropic handles temperature differently
+            request.ReasoningEffort = null;
+        }
+
         return request;
     }
 
@@ -167,6 +212,9 @@ public sealed class OpenAiService : IOpenAiService
         [JsonPropertyName("model")] public string Model { get; set; } = "gpt-4o-mini";
         [JsonPropertyName("messages")] public List<ChatMessage> Messages { get; set; } = [];
         [JsonPropertyName("stream")] public bool Stream { get; set; }
+        [JsonPropertyName("system")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? System { get; set; }
         [JsonPropertyName("temperature")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public double? Temperature { get; set; } = 0.3;

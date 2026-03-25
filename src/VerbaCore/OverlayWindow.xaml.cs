@@ -1,3 +1,4 @@
+using System.Net.Http;
 using System.Text;
 using System.Windows;
 using System.Windows.Documents;
@@ -123,6 +124,19 @@ public partial class OverlayWindow : Window
                 if (e.Key == System.Windows.Input.Key.Escape)
                 {
                     HideOverlay();
+                    e.Handled = true;
+                }
+                // Ctrl+C: copy result to clipboard
+                else if (e.Key == System.Windows.Input.Key.C &&
+                         System.Windows.Input.Keyboard.Modifiers == System.Windows.Input.ModifierKeys.Control)
+                {
+                    var range = new TextRange(ResultViewer.Document.ContentStart, ResultViewer.Document.ContentEnd);
+                    var text = range.Text.Trim();
+                    if (!string.IsNullOrEmpty(text))
+                    {
+                        System.Windows.Clipboard.SetText(text);
+                        StatusLabel.Text = "결과가 클립보드에 복사되었습니다";
+                    }
                     e.Handled = true;
                 }
                 // Reset auto-hide timer on any key press
@@ -399,10 +413,9 @@ public partial class OverlayWindow : Window
         _cts = new CancellationTokenSource();
         var ct = _cts.Token;
 
-        // Show result area immediately — no loading spinner
-        LoadingPanel.Visibility = Visibility.Collapsed;
-        ResultViewer.Visibility = Visibility.Visible;
-        RenderPlainText("...");
+        // Show loading indicator until first chunk arrives
+        ResultViewer.Visibility = Visibility.Collapsed;
+        LoadingPanel.Visibility = Visibility.Visible;
         StatusLabel.Text = "";
 
         var src = _settingsService.Current.SourceLanguage;
@@ -411,9 +424,16 @@ public partial class OverlayWindow : Window
         try
         {
             var sb = new StringBuilder();
+            var firstChunk = true;
             await foreach (var chunk in _openAiService.StreamCompletionAsync(
                 input, _currentMode, src, tgt, ct))
             {
+                if (firstChunk)
+                {
+                    firstChunk = false;
+                    LoadingPanel.Visibility = Visibility.Collapsed;
+                    ResultViewer.Visibility = Visibility.Visible;
+                }
                 sb.Append(chunk);
 
                 // Throttled rendering during streaming
@@ -429,7 +449,7 @@ public partial class OverlayWindow : Window
             // Final render with full Markdown formatting
             RenderMarkdown(sb.ToString());
 
-            StatusLabel.Text = "완료 — 아무 키를 누르면 닫힙니다";
+            StatusLabel.Text = "완료 — Ctrl+C: 복사 · Esc: 닫기";
 
             // Save to history
             await _historyService.AddAsync(new LookupHistoryItem
@@ -444,14 +464,24 @@ public partial class OverlayWindow : Window
             // Auto-hide after delay
             _autoHideTimer.Start();
         }
+        catch (TaskCanceledException ex) when (ex.InnerException is TimeoutException)
+        {
+            LoadingPanel.Visibility = Visibility.Collapsed;
+            ResultViewer.Visibility = Visibility.Visible;
+            RenderMarkdown("## \u23f0 시간 초과\n\n응답 시간이 초과되었습니다. 다시 시도해주세요.");
+            StatusLabel.Text = "시간 초과";
+            _autoHideTimer.Start();
+        }
         catch (OperationCanceledException)
         {
             // Cancelled by new CapsLock press
+            LoadingPanel.Visibility = Visibility.Collapsed;
         }
         catch (Exception ex)
         {
+            LoadingPanel.Visibility = Visibility.Collapsed;
             ResultViewer.Visibility = Visibility.Visible;
-            RenderMarkdown($"오류: {ex.Message}\n\nAPI Key와 네트워크를 확인해주세요.");
+            RenderMarkdown($"## \u274c 오류\n\n{ex.Message}\n\nAPI Key와 설정을 확인해주세요.");
             StatusLabel.Text = "오류 발생";
             _autoHideTimer.Start();
         }
@@ -509,6 +539,9 @@ public partial class OverlayWindow : Window
     {
         _autoHideTimer.Stop();
         _cursorBlinkTimer.Stop();
+        _cts?.Cancel();
+        _cts?.Dispose();
+        _cts = null;
         _isShown = false;
         _persistentMode = false;
         _userExplicitlySetMode = false;

@@ -54,12 +54,16 @@ English, Korean, Japanese, Chinese (Simplified & Traditional), Spanish, French, 
 
 ### More
 
-- 🌙 **Dark / Light / System theme** with Fluent Design (WPF-UI)
-- 📋 **Lookup history** — searchable, re-queryable, persisted across sessions (up to 200 items)
+- 🌙 **Dark / Light / System theme** — System mode auto-detects your Windows theme
+- 📋 **Lookup history** — searchable, copyable, deletable, re-queryable (up to 200 items)
 - 🔐 **Secure API key storage** — encrypted with Windows DPAPI (machine + user scoped)
 - 📍 **9-point popup positioning** — place the overlay at any corner, edge, or center
-- 🚀 **Start with Windows** — optional auto-launch at login
-- 🧠 **Reasoning model support** — works with GPT-4o, GPT-4o-mini, o1, o3 with configurable thinking effort
+- 🚀 **Start with Windows** — auto-launch at login (registry-managed)
+- 🧠 **Reasoning model support** — works with GPT-4o, o1, o3 with configurable thinking effort
+- 📎 **Ctrl+C in overlay** — copy AI results directly to clipboard
+- 🔒 **Single instance** — prevents duplicate processes via named Mutex
+- ⚡ **Live settings** — theme, hotkey, and auto-start changes apply immediately without restart
+- 🔄 **Smart error handling** — distinct messages for auth errors, rate limits, timeouts, and network issues
 
 ## Quick Start
 
