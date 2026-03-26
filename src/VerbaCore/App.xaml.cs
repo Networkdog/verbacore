@@ -180,13 +180,36 @@ public partial class App : Application
 
         if (enable)
         {
-            var exePath = Environment.ProcessPath ?? System.Reflection.Assembly.GetExecutingAssembly().Location;
+            var exePath = GetAppExePath();
+            if (string.IsNullOrEmpty(exePath) || !System.IO.File.Exists(exePath))
+                return;
             key.SetValue(appName, $"\"{exePath}\"");
         }
         else
         {
             key.DeleteValue(appName, throwOnMissingValue: false);
         }
+    }
+
+    private static string? GetAppExePath()
+    {
+        var processPath = Environment.ProcessPath;
+
+        // When running via 'dotnet run', ProcessPath points to dotnet.exe — resolve the actual app host
+        if (processPath is not null
+            && !System.IO.Path.GetFileNameWithoutExtension(processPath)
+                    .Equals("dotnet", StringComparison.OrdinalIgnoreCase))
+        {
+            return processPath;
+        }
+
+        var asmLocation = System.Reflection.Assembly.GetEntryAssembly()?.Location;
+        if (!string.IsNullOrEmpty(asmLocation))
+        {
+            return System.IO.Path.ChangeExtension(asmLocation, ".exe");
+        }
+
+        return processPath;
     }
 
     private void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
