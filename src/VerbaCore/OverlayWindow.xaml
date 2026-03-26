@@ -7,7 +7,7 @@
         Background="Transparent"
         Topmost="True"
         ShowInTaskbar="False"
-        WindowStartupLocation="CenterScreen"
+        WindowStartupLocation="Manual"
         Width="800" Height="600"
         ResizeMode="NoResize"
         Focusable="True">
