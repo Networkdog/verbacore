@@ -18,6 +18,8 @@ public sealed class SpeechInputService : IDisposable
 
         try
         {
+            // Dispose previous engine if any (e.g. after StopListening)
+            _engine?.Dispose();
             _engine = new SpeechRecognitionEngine(new System.Globalization.CultureInfo(culture));
             _engine.LoadGrammar(new DictationGrammar());
             _engine.SetInputToDefaultAudioDevice();

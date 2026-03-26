@@ -98,6 +98,7 @@ public partial class MainViewModel : ObservableObject
 
         // Cancel any previous request
         _cts?.Cancel();
+        _cts?.Dispose();
         _cts = new CancellationTokenSource();
         var ct = _cts.Token;
 
@@ -204,12 +205,12 @@ public partial class MainViewModel : ObservableObject
     partial void OnSourceLanguageChanged(string value)
     {
         _settingsService.Current.SourceLanguage = value;
-        _ = _settingsService.SaveAsync();
+        _settingsService.QueueSave();
     }
 
     partial void OnTargetLanguageChanged(string value)
     {
         _settingsService.Current.TargetLanguage = value;
-        _ = _settingsService.SaveAsync();
+        _settingsService.QueueSave();
     }
 }

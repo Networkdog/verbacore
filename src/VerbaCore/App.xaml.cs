@@ -125,7 +125,7 @@ public partial class App : Application
 
     private void ShowSettingsWindow()
     {
-        if (_settingsWindow == null)
+        if (_settingsWindow == null || !_settingsWindow.IsLoaded)
         {
             _settingsWindow = new SettingsWindow();
         }
@@ -138,7 +138,7 @@ public partial class App : Application
     {
         _capsLockService?.Dispose();
         _trayIcon?.Dispose();
-        _overlayWindow?.Close();
+        _overlayWindow?.CloseForShutdown();
         _settingsWindow?.Close();
         _singleInstanceMutex?.ReleaseMutex();
         _singleInstanceMutex?.Dispose();
@@ -221,10 +221,21 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
-        _capsLockService?.Dispose();
-        _trayIcon?.Dispose();
+        // CapsLock, tray, overlay already cleaned up in ExitApp();
+        // only dispose remaining resources here for safety
+        if (_capsLockService is { } cls)
+        {
+            cls.Dispose();
+            _capsLockService = null;
+        }
+        if (_trayIcon is { } tray)
+        {
+            tray.Dispose();
+            _trayIcon = null;
+        }
         _singleInstanceMutex?.ReleaseMutex();
         _singleInstanceMutex?.Dispose();
+        _singleInstanceMutex = null;
         Services.Dispose();
         base.OnExit(e);
     }

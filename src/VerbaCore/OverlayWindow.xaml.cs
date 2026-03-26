@@ -38,6 +38,8 @@ public partial class OverlayWindow : Window
     private bool _justOpened;
     /// <summary>Selected text grabbed from the focused app when CapsLock was pressed.</summary>
     private string? _grabbedSelectedText;
+    /// <summary>True while an API lookup is actively streaming.</summary>
+    private bool _isLookupInProgress;
 
     private static readonly MarkdownPipeline MarkdownPipeline = new MarkdownPipelineBuilder()
         .UseSupportedExtensions()
@@ -94,9 +96,10 @@ public partial class OverlayWindow : Window
         _capsLockService.EnterPressed += OnEnterPressed;
 
         // Close overlay when it loses focus (user clicked outside)
+        // Don't auto-close during an active API lookup — user can still Esc/CapsLock to close
         Deactivated += (_, _) =>
         {
-            if (_isShown)
+            if (_isShown && !_isLookupInProgress)
                 HideOverlay();
         };
 
@@ -134,7 +137,8 @@ public partial class OverlayWindow : Window
                     var text = range.Text.Trim();
                     if (!string.IsNullOrEmpty(text))
                     {
-                        System.Windows.Clipboard.SetText(text);
+                        try { System.Windows.Clipboard.SetText(text); }
+                        catch (System.Runtime.InteropServices.ExternalException) { }
                         StatusLabel.Text = "결과가 클립보드에 복사되었습니다";
                     }
                     e.Handled = true;
@@ -358,8 +362,9 @@ public partial class OverlayWindow : Window
                 _currentMode = _modes[_modeIndex];
                 _userExplicitlySetMode = true;
                 UpdateModeLabel();
-                // Remove tab from buffer by clearing and re-setting
-                _capsLockService.ClearBuffer();
+                // Remove tab from buffer, preserving any text typed before it
+                var cleaned = buffer.TrimEnd('\t');
+                _capsLockService.SetBuffer(cleaned);
                 return;
             }
 
@@ -394,6 +399,8 @@ public partial class OverlayWindow : Window
 
     private async Task PerformLookupAsync(string input)
     {
+        if (_isLookupInProgress) return;
+
         if (string.IsNullOrEmpty(_settingsService.Current.ApiKey))
         {
             StatusLabel.Text = "⚠ API Key가 설정되지 않았습니다. 트레이 아이콘 → 설정";
@@ -410,8 +417,10 @@ public partial class OverlayWindow : Window
         }
 
         _cts?.Cancel();
+        _cts?.Dispose();
         _cts = new CancellationTokenSource();
         var ct = _cts.Token;
+        _isLookupInProgress = true;
 
         // Show loading indicator until first chunk arrives
         ResultViewer.Visibility = Visibility.Collapsed;
@@ -485,6 +494,10 @@ public partial class OverlayWindow : Window
             StatusLabel.Text = "오류 발생";
             _autoHideTimer.Start();
         }
+        finally
+        {
+            _isLookupInProgress = false;
+        }
     }
 
     private void ResetAutoHideTimer()
@@ -498,9 +511,8 @@ public partial class OverlayWindow : Window
 
     private void ShowOverlay()
     {
-        var screenW = SystemParameters.PrimaryScreenWidth;
-        var screenH = SystemParameters.PrimaryScreenHeight;
-        Width = Math.Min(700, screenW * 0.5);
+        var workArea = SystemParameters.WorkArea;
+        Width = Math.Min(700, workArea.Width * 0.5);
         Height = 600;
 
         var pos = _settingsService.Current.PopupPosition;
@@ -508,16 +520,16 @@ public partial class OverlayWindow : Window
 
         Left = pos switch
         {
-            OverlayPosition.TopLeft or OverlayPosition.CenterLeft or OverlayPosition.BottomLeft => margin,
-            OverlayPosition.TopRight or OverlayPosition.CenterRight or OverlayPosition.BottomRight => screenW - Width - margin,
-            _ => (screenW - Width) / 2
+            OverlayPosition.TopLeft or OverlayPosition.CenterLeft or OverlayPosition.BottomLeft => workArea.Left + margin,
+            OverlayPosition.TopRight or OverlayPosition.CenterRight or OverlayPosition.BottomRight => workArea.Right - Width - margin,
+            _ => workArea.Left + (workArea.Width - Width) / 2
         };
 
         Top = pos switch
         {
-            OverlayPosition.TopLeft or OverlayPosition.TopCenter or OverlayPosition.TopRight => margin,
-            OverlayPosition.BottomLeft or OverlayPosition.BottomCenter or OverlayPosition.BottomRight => screenH - Height - margin - 40,
-            _ => (screenH - Height) / 2
+            OverlayPosition.TopLeft or OverlayPosition.TopCenter or OverlayPosition.TopRight => workArea.Top + margin,
+            OverlayPosition.BottomLeft or OverlayPosition.BottomCenter or OverlayPosition.BottomRight => workArea.Bottom - Height - margin,
+            _ => workArea.Top + (workArea.Height - Height) / 2
         };
 
         _isShown = true;
@@ -537,6 +549,8 @@ public partial class OverlayWindow : Window
 
     public void HideOverlay()
     {
+        if (!_isShown) return;
+
         _autoHideTimer.Stop();
         _cursorBlinkTimer.Stop();
         _cts?.Cancel();
@@ -554,11 +568,36 @@ public partial class OverlayWindow : Window
         var fadeOut = new DoubleAnimation(1, 0, TimeSpan.FromMilliseconds(150));
         fadeOut.Completed += (_, _) =>
         {
-            // Move off-screen instead of Hide() to avoid re-render flash
-            Left = -9999;
-            Top = -9999;
+            // Only move off-screen if overlay hasn't been re-shown during fade
+            if (!_isShown)
+            {
+                Left = -9999;
+                Top = -9999;
+            }
         };
         RootGrid.BeginAnimation(OpacityProperty, fadeOut);
+    }
+
+    /// <summary>
+    /// Closes the overlay for app shutdown, bypassing hide/fade logic.
+    /// </summary>
+    public void CloseForShutdown()
+    {
+        _isShown = false;
+        _autoHideTimer.Stop();
+        _cursorBlinkTimer.Stop();
+        _cts?.Cancel();
+        _cts?.Dispose();
+        _cts = null;
+
+        // Unsubscribe to avoid Deactivated handler firing during close
+        _capsLockService.CapsLockPressed -= OnCapsLockPressed;
+        _capsLockService.QuickTapReleased -= OnQuickTapReleased;
+        _capsLockService.LongPressReleased -= OnLongPressReleased;
+        _capsLockService.BufferChanged -= OnBufferChanged;
+        _capsLockService.EnterPressed -= OnEnterPressed;
+
+        Close();
     }
 
     private static string LangCode(string lang) => lang switch
@@ -570,7 +609,15 @@ public partial class OverlayWindow : Window
         "Spanish" => "ES",
         "French" => "FR",
         "German" => "DE",
-        _ => lang[..2].ToUpperInvariant()
+        "Portuguese" => "PT",
+        "Russian" => "RU",
+        "Arabic" => "AR",
+        "Italian" => "IT",
+        "Dutch" => "NL",
+        "Vietnamese" => "VI",
+        "Thai" => "TH",
+        "Indonesian" => "ID",
+        _ => lang.Length >= 2 ? lang[..2].ToUpperInvariant() : lang.ToUpperInvariant()
     };
 
     private void RenderMarkdown(string markdown)

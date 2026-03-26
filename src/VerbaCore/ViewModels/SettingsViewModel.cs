@@ -186,6 +186,8 @@ public partial class SettingsViewModel : ObservableObject
         }
     }
 
+    private CancellationTokenSource? _statusClearCts;
+
     [RelayCommand]
     private async Task SaveSettingsAsync()
     {
@@ -235,8 +237,14 @@ public partial class SettingsViewModel : ObservableObject
 
         StatusMessage = "설정이 저장되었습니다.";
 
-        // Auto-clear status
-        await Task.Delay(2000);
-        StatusMessage = string.Empty;
+        // Auto-clear status (cancel any previous clear timer)
+        _statusClearCts?.Cancel();
+        _statusClearCts = new CancellationTokenSource();
+        try
+        {
+            await Task.Delay(2000, _statusClearCts.Token);
+            StatusMessage = string.Empty;
+        }
+        catch (OperationCanceledException) { }
     }
 }

@@ -33,10 +33,16 @@ public partial class MainWindow : FluentWindow
 
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
+        // Only register once — Loaded fires each time Show() is called
+        if (_hotkeyRegistered) return;
+        _hotkeyRegistered = true;
+
         // Register global hotkey
         _hotkeyService.HotkeyPressed += OnHotkeyPressed;
         _hotkeyService.Register(_settingsService.Current.GlobalHotkey);
     }
+
+    private bool _hotkeyRegistered;
 
     private void OnHotkeyPressed(object? sender, EventArgs e)
     {

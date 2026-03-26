@@ -19,6 +19,8 @@ public sealed class CapsLockService : IDisposable
     private string _buffer = string.Empty;
     private long _capsDownTimestamp;
     private bool _typedWhileHeld;
+    /// <summary>Set when Esc cancels a CapsLock hold, to suppress the subsequent KeyUp event.</summary>
+    private bool _escapeCancelledHold;
 
     /// <summary>Fired when CapsLock is pressed down.</summary>
     public event EventHandler? CapsLockPressed;
@@ -38,9 +40,9 @@ public sealed class CapsLockService : IDisposable
     public event EventHandler<string>? BufferChanged;
     public event EventHandler<char>? CharTyped;
 
-    public bool IsCapsDown => _capsDown;
-    public string Buffer => _buffer;
-    public bool TypedWhileHeld => _typedWhileHeld;
+    public bool IsCapsDown => Volatile.Read(ref _capsDown);
+    public string Buffer => Volatile.Read(ref _buffer);
+    public bool TypedWhileHeld => Volatile.Read(ref _typedWhileHeld);
 
     /// <summary>
     /// Set by OverlayWindow when persistent (quick-tap) mode is active.
@@ -70,6 +72,12 @@ public sealed class CapsLockService : IDisposable
     public void ClearBuffer()
     {
         _buffer = string.Empty;
+        BufferChanged?.Invoke(this, _buffer);
+    }
+
+    public void SetBuffer(string value)
+    {
+        _buffer = value;
         BufferChanged?.Invoke(this, _buffer);
     }
 
@@ -105,6 +113,14 @@ public sealed class CapsLockService : IDisposable
 
                 if (msg is NativeMethods.WM_KEYUP or NativeMethods.WM_SYSKEYUP)
                 {
+                    // If Esc already cancelled the hold, just consume the stale KeyUp
+                    if (_escapeCancelledHold)
+                    {
+                        _escapeCancelledHold = false;
+                        NativeMethods.ToggleCapsLockOff();
+                        return (IntPtr)1;
+                    }
+
                     if (_capsDown)
                     {
                         _capsDown = false;
@@ -130,11 +146,10 @@ public sealed class CapsLockService : IDisposable
             // While CapsLock is held, capture typed keys
             if (_capsDown && msg is NativeMethods.WM_KEYDOWN or NativeMethods.WM_SYSKEYDOWN)
             {
-                _typedWhileHeld = true;
-
                 var ch = VkCodeToChar(vkCode);
                 if (ch.HasValue)
                 {
+                    _typedWhileHeld = true;
                     _buffer += ch.Value;
                     CharTyped?.Invoke(this, ch.Value);
                     BufferChanged?.Invoke(this, _buffer);
@@ -142,10 +157,16 @@ public sealed class CapsLockService : IDisposable
                 }
 
                 // Handle Backspace
-                if (vkCode == 0x08 && _buffer.Length > 0) // VK_BACK
+                if (vkCode == 0x08) // VK_BACK
                 {
-                    _buffer = _buffer[..^1];
-                    BufferChanged?.Invoke(this, _buffer);
+                    if (_buffer.Length > 0)
+                    {
+                        _buffer = _buffer[..^1];
+                        BufferChanged?.Invoke(this, _buffer);
+                    }
+                    // Only mark typed if there was actual content to delete
+                    if (_buffer.Length > 0 || _typedWhileHeld)
+                        _typedWhileHeld = true;
                     return (IntPtr)1;
                 }
 
@@ -162,6 +183,7 @@ public sealed class CapsLockService : IDisposable
                 {
                     _buffer = string.Empty;
                     _capsDown = false;
+                    _escapeCancelledHold = true;
                     BufferChanged?.Invoke(this, _buffer);
                     LongPressReleased?.Invoke(this, EventArgs.Empty);
                     return (IntPtr)1;
@@ -170,6 +192,7 @@ public sealed class CapsLockService : IDisposable
                 // Handle Space
                 if (vkCode == 0x20) // VK_SPACE
                 {
+                    _typedWhileHeld = true;
                     _buffer += ' ';
                     BufferChanged?.Invoke(this, _buffer);
                     return (IntPtr)1;

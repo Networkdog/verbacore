@@ -44,10 +44,22 @@ public sealed class OpenAiService : IOpenAiService
         return s.Provider switch
         {
             ApiProvider.AzureOpenAI => $"{s.AzureEndpoint.TrimEnd('/')}/openai/deployments/{s.Model}/chat/completions?api-version={s.AzureApiVersion}",
-            ApiProvider.Custom => $"{s.CustomEndpoint.TrimEnd('/')}/v1/chat/completions",
+            ApiProvider.Custom => BuildCustomUrl(s.CustomEndpoint),
             ApiProvider.Google => $"https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
             _ => ProviderUrls.GetValueOrDefault(s.Provider, ProviderUrls[ApiProvider.OpenAI])
         };
+    }
+
+    private static string BuildCustomUrl(string endpoint)
+    {
+        var trimmed = endpoint.TrimEnd('/');
+        // If user already included /v1 or a versioned path, append directly
+        if (trimmed.EndsWith("/v1", StringComparison.OrdinalIgnoreCase)
+            || trimmed.Contains("/v1/", StringComparison.OrdinalIgnoreCase))
+        {
+            return $"{trimmed}/chat/completions";
+        }
+        return $"{trimmed}/v1/chat/completions";
     }
 
     private void ApplyAuth(HttpRequestMessage httpRequest)
@@ -148,8 +160,30 @@ public sealed class OpenAiService : IOpenAiService
                 var data = line["data: ".Length..];
                 if (data == "[DONE]") yield break;
 
-                var chunk = JsonSerializer.Deserialize<ChatCompletionChunk>(data);
-                var content = chunk?.Choices?.FirstOrDefault()?.Delta?.Content;
+                // Anthropic SSE uses content_block_delta; OpenAI-compatible uses choices[].delta
+                string? content = null;
+                try
+                {
+                    using var doc = JsonDocument.Parse(data);
+                    var root = doc.RootElement;
+
+                    if (root.TryGetProperty("choices", out var choices)
+                        && choices.GetArrayLength() > 0
+                        && choices[0].TryGetProperty("delta", out var delta)
+                        && delta.TryGetProperty("content", out var contentProp))
+                    {
+                        content = contentProp.GetString();
+                    }
+                    else if (root.TryGetProperty("type", out var typeProp)
+                             && typeProp.GetString() == "content_block_delta"
+                             && root.TryGetProperty("delta", out var anthropicDelta)
+                             && anthropicDelta.TryGetProperty("text", out var textProp))
+                    {
+                        content = textProp.GetString();
+                    }
+                }
+                catch (JsonException) { continue; }
+
                 if (!string.IsNullOrEmpty(content))
                 {
                     yield return content;
@@ -189,7 +223,7 @@ public sealed class OpenAiService : IOpenAiService
             // Reasoning models don't support temperature
             Temperature = isReasoning ? null : 0.3,
             ReasoningEffort = isReasoning ? effort : null,
-            MaxTokens = isReasoning ? null : (mode == LookupMode.Dictionary ? 2048 : 4096)
+            MaxCompletionTokens = isReasoning ? null : (mode == LookupMode.Dictionary ? 2048 : 4096)
         };
 
         // Anthropic uses "max_tokens" (required) and doesn't support "system" role in messages
@@ -197,6 +231,8 @@ public sealed class OpenAiService : IOpenAiService
         {
             request.System = request.Messages[0].Content;
             request.Messages.RemoveAt(0);
+            // Anthropic requires max_tokens, not max_completion_tokens
+            request.MaxCompletionTokens = null;
             request.MaxTokens = mode == LookupMode.Dictionary ? 2048 : 4096;
             request.Temperature = null; // Anthropic handles temperature differently
             request.ReasoningEffort = null;
@@ -221,6 +257,9 @@ public sealed class OpenAiService : IOpenAiService
         [JsonPropertyName("reasoning_effort")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public string? ReasoningEffort { get; set; }
+        [JsonPropertyName("max_completion_tokens")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public int? MaxCompletionTokens { get; set; }
         [JsonPropertyName("max_tokens")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public int? MaxTokens { get; set; }

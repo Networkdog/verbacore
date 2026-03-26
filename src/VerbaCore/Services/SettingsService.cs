@@ -19,6 +19,7 @@ public sealed class SettingsService
     };
 
     private AppSettings _current = new();
+    private CancellationTokenSource? _debounceCts;
 
     public AppSettings Current => _current;
 
@@ -30,8 +31,17 @@ public sealed class SettingsService
             return;
         }
 
-        var json = await File.ReadAllTextAsync(SettingsPath);
-        _current = JsonSerializer.Deserialize<AppSettings>(json, JsonOptions) ?? new AppSettings();
+        try
+        {
+            var json = await File.ReadAllTextAsync(SettingsPath);
+            _current = JsonSerializer.Deserialize<AppSettings>(json, JsonOptions) ?? new AppSettings();
+        }
+        catch (JsonException)
+        {
+            // Corrupted settings file — start fresh
+            _current = new AppSettings();
+            return;
+        }
 
         // Decrypt API key
         if (!string.IsNullOrEmpty(_current.ApiKeyProtected))
@@ -94,5 +104,20 @@ public sealed class SettingsService
         {
             return string.Empty;
         }
+    }
+
+    /// <summary>
+    /// Debounced save — coalesces rapid successive calls into a single write after 300ms.
+    /// </summary>
+    public void QueueSave()
+    {
+        _debounceCts?.Cancel();
+        _debounceCts = new CancellationTokenSource();
+        var ct = _debounceCts.Token;
+        _ = Task.Delay(300, ct).ContinueWith(async _ =>
+        {
+            if (!ct.IsCancellationRequested)
+                await SaveAsync();
+        }, ct, TaskContinuationOptions.OnlyOnRanToCompletion, TaskScheduler.Default);
     }
 }

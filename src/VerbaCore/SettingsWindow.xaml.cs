@@ -13,6 +13,16 @@ public partial class SettingsWindow : FluentWindow
         HistoryViewPage.DataContext = App.GetService<ViewModels.HistoryViewModel>();
 
         Closing += OnClosing;
+
+        // Refresh history when the window becomes visible
+        IsVisibleChanged += (_, e) =>
+        {
+            if (e.NewValue is true)
+            {
+                if (HistoryViewPage.DataContext is ViewModels.HistoryViewModel hvm)
+                    hvm.RefreshItems();
+            }
+        };
     }
 
     private void OnClosing(object? sender, CancelEventArgs e)

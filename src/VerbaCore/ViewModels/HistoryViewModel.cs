@@ -55,7 +55,8 @@ public partial class HistoryViewModel : ObservableObject
     private static void CopyResult(LookupHistoryItem? item)
     {
         if (item == null) return;
-        System.Windows.Clipboard.SetText(item.Response);
+        try { System.Windows.Clipboard.SetText(item.Response); }
+        catch (System.Runtime.InteropServices.ExternalException) { }
     }
 
     [RelayCommand]

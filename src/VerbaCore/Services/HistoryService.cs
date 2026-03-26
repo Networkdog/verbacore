@@ -29,8 +29,16 @@ public sealed class HistoryService
             return;
         }
 
-        var json = await File.ReadAllTextAsync(HistoryPath);
-        _history = JsonSerializer.Deserialize<LookupHistory>(json, JsonOptions) ?? new LookupHistory();
+        try
+        {
+            var json = await File.ReadAllTextAsync(HistoryPath);
+            _history = JsonSerializer.Deserialize<LookupHistory>(json, JsonOptions) ?? new LookupHistory();
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            // Corrupted history file — start fresh
+            _history = new LookupHistory();
+        }
     }
 
     public async Task AddAsync(LookupHistoryItem item)

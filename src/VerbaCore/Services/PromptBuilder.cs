@@ -47,7 +47,8 @@ public sealed class PromptBuilder
     {
         return $$"""
             [Critical Rules]
-            - The heading MUST show the ENGLISH word (e.g., "neighbor", NOT "이웃").
+            - Do NOT repeat the input word as a heading or title — the UI already displays it.
+            - Start directly with the IPA pronunciation line.
             - IPA must be for the ENGLISH pronunciation (e.g., /ˈneɪbər/, NOT Korean IPA).
             - Korean pronunciation is a phonetic approximation in Hangul (e.g., 네이버).
             - If the user inputs a Korean word, find the matching English word and explain THAT English word.
@@ -71,7 +72,7 @@ public sealed class PromptBuilder
             5. Pronunciation: IPA for the English word + closest Korean phonetic spelling, both in backticks.
 
             [Output Template]
-            ### `/ˈIPA/` `Korean Phonetic`
+            `/ˈIPA/` `Korean Phonetic`
             **{POS}** {Korean meaning}; **{POS}** {Korean meaning}
 
             > 📌 **{root/prefix}** ({origin meaning}) + **{root/suffix}** ({origin meaning}): {brief origin story in Korean}
@@ -84,14 +85,6 @@ public sealed class PromptBuilder
             * **{English sentence}** — {Korean translation} *({brief nuance note in Korean})*
             * **{English sentence}** — {Korean translation} *({brief nuance note in Korean})*
             * **{English sentence}** — {Korean translation} *({brief nuance note in Korean})*
-
-            ## 유의어
-            * **{English synonym}** `{Korean phonetic}` {POS}. {Korean meaning} — *{nuance difference vs input word, in Korean}*
-            * (at least 4)
-
-            ## 반의어
-            * **{English antonym}** `{Korean phonetic}` {POS}. {Korean meaning} — *{nuance difference vs input word, in Korean}*
-            * (at least 4)
 
             [Input Word]: {{word}}
             """;
