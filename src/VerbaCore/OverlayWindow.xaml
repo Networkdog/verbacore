@@ -12,7 +12,7 @@
         ResizeMode="NoResize"
         Focusable="True">
 
-    <Grid x:Name="RootGrid" Opacity="0">
+    <Grid x:Name="RootGrid">
         <!-- Semi-transparent backdrop -->
         <Border Background="#CC1A1A2E"
                 CornerRadius="16"

@@ -88,3 +88,4 @@ dotnet run
 - No OCR dependency — cursor text extraction uses UI Automation only
 - No SQLite dependency — history is JSON-based for minimal footprint
 - No OCR dependency — cursor text extraction uses UI Automation only
+- 디버깅할 때 이미 실행 중인 인스턴스가 있으면 키보드 후킹이 꼬일 수 있으니, 강제로 `VerbaCore.exe` 프로세스를 완전히 종료한 후 디버깅 시작할 것.

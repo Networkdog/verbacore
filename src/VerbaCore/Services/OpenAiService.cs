@@ -201,10 +201,14 @@ public sealed class OpenAiService : IOpenAiService
     {
         var effort = _settings.Current.ReasoningEffort;
         var isReasoning = !string.IsNullOrEmpty(effort) && effort != "none";
+        var model = _settings.Current.Model;
+
+        // Reasoning-capable models (o-series, gpt-5.x) don't support temperature
+        var isReasoningModel = isReasoning || IsReasoningCapableModel(model);
 
         var request = new ChatCompletionRequest
         {
-            Model = _settings.Current.Model,
+            Model = model,
             Stream = stream,
             Messages =
             [
@@ -220,8 +224,8 @@ public sealed class OpenAiService : IOpenAiService
                     Content = _promptBuilder.Build(input, mode, sourceLanguage, targetLanguage)
                 }
             ],
-            // Reasoning models don't support temperature
-            Temperature = isReasoning ? null : 0.3,
+            // Reasoning-capable models don't support temperature
+            Temperature = isReasoningModel ? null : 0.3,
             ReasoningEffort = isReasoning ? effort : null,
             MaxCompletionTokens = isReasoning ? null : (mode == LookupMode.Dictionary ? 2048 : 4096)
         };
@@ -239,6 +243,25 @@ public sealed class OpenAiService : IOpenAiService
         }
 
         return request;
+    }
+
+    /// <summary>
+    /// Detects reasoning-capable models that don't support the temperature parameter.
+    /// Covers o-series (o1, o3, o4-mini) and gpt-5.x reasoning models.
+    /// </summary>
+    private static bool IsReasoningCapableModel(string model)
+    {
+        // o1, o1-mini, o3, o3-mini, o4-mini, etc.
+        if (model.StartsWith("o", StringComparison.OrdinalIgnoreCase)
+            && model.Length >= 2
+            && char.IsDigit(model[1]))
+            return true;
+
+        // gpt-5.x models are reasoning-capable
+        if (model.StartsWith("gpt-5", StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        return false;
     }
 
     // --- Request/Response DTOs ---

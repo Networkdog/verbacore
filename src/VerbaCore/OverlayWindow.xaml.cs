@@ -534,17 +534,21 @@ public partial class OverlayWindow : Window
 
         _isShown = true;
 
-        // Only call Show() once — after that, use opacity to hide/show
+        // Use Window.Opacity for fade — immune to WPF-UI theme changes
+        BeginAnimation(OpacityProperty, null);
+        Opacity = 0;
+
         if (!IsVisible)
         {
-            RootGrid.Opacity = 0;
             Show();
         }
 
         Activate();
 
         var fadeIn = new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(120));
-        RootGrid.BeginAnimation(OpacityProperty, fadeIn);
+        fadeIn.FillBehavior = FillBehavior.Stop;
+        fadeIn.Completed += (_, _) => Opacity = 1;
+        BeginAnimation(OpacityProperty, fadeIn);
     }
 
     public void HideOverlay()
@@ -566,8 +570,12 @@ public partial class OverlayWindow : Window
         InputDisplay.Visibility = Visibility.Visible;
 
         var fadeOut = new DoubleAnimation(1, 0, TimeSpan.FromMilliseconds(150));
+        fadeOut.FillBehavior = FillBehavior.Stop;
         fadeOut.Completed += (_, _) =>
         {
+            BeginAnimation(OpacityProperty, null);
+            Opacity = 0;
+
             // Only move off-screen if overlay hasn't been re-shown during fade
             if (!_isShown)
             {
@@ -575,7 +583,7 @@ public partial class OverlayWindow : Window
                 Top = -9999;
             }
         };
-        RootGrid.BeginAnimation(OpacityProperty, fadeOut);
+        BeginAnimation(OpacityProperty, fadeOut);
     }
 
     /// <summary>

@@ -137,11 +137,14 @@ public partial class App : Application
     private void ExitApp()
     {
         _capsLockService?.Dispose();
+        _capsLockService = null;
         _trayIcon?.Dispose();
+        _trayIcon = null;
         _overlayWindow?.CloseForShutdown();
         _settingsWindow?.Close();
         _singleInstanceMutex?.ReleaseMutex();
         _singleInstanceMutex?.Dispose();
+        _singleInstanceMutex = null;
         Shutdown();
     }
 
@@ -153,6 +156,12 @@ public partial class App : Application
             ThemeMode.Dark => ApplicationTheme.Dark,
             _ => DetectSystemTheme()
         };
+
+        // Skip if theme hasn't changed — avoids unnecessary resource dictionary swap
+        // that resets overlay opacity and causes visual flicker
+        if (ApplicationThemeManager.GetAppTheme() == theme)
+            return;
+
         ApplicationThemeManager.Apply(theme);
     }
 
