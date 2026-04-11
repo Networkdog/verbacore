@@ -76,7 +76,16 @@ public partial class App : Application
 
         // Apply saved settings
         ApplyTheme(settings.Current.Theme);
-        ApplyStartWithWindows(settings.Current.StartWithWindows);
+
+        if (settings.IsFirstRun)
+        {
+            // On first run, sync from registry so installer's choice is preserved
+            settings.Current.StartWithWindows = IsStartWithWindowsInRegistry();
+        }
+        else
+        {
+            ApplyStartWithWindows(settings.Current.StartWithWindows);
+        }
 
         // Create overlay window (hidden by default)
         _capsLockService = GetService<CapsLockService>();
@@ -198,6 +207,14 @@ public partial class App : Application
         {
             key.DeleteValue(appName, throwOnMissingValue: false);
         }
+    }
+
+    private static bool IsStartWithWindowsInRegistry()
+    {
+        const string appName = "VerbaCore";
+        using var key = Registry.CurrentUser.OpenSubKey(
+            @"Software\Microsoft\Windows\CurrentVersion\Run");
+        return key?.GetValue(appName) is not null;
     }
 
     private static string? GetAppExePath()

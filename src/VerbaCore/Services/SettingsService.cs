@@ -23,10 +23,14 @@ public sealed class SettingsService
 
     public AppSettings Current => _current;
 
+    /// <summary>True if no settings file existed when LoadAsync was called (first run).</summary>
+    public bool IsFirstRun { get; private set; }
+
     public async Task LoadAsync()
     {
         if (!File.Exists(SettingsPath))
         {
+            IsFirstRun = true;
             _current = new AppSettings();
             return;
         }
