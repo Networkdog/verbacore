@@ -11,6 +11,8 @@
     <RootNamespace>VerbaCore</RootNamespace>
     <TieredCompilation>true</TieredCompilation>
     <TieredPGO>true</TieredPGO>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
 
     <!-- Product metadata -->
     <Product>VerbaCore</Product>

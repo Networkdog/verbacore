@@ -132,7 +132,7 @@
                                           Background="Transparent"
                                           Foreground="{DynamicResource TextFillColorPrimaryBrush}"
                                           FontSize="14"
-                                          FontFamily="AppleSDGothicNeoR00, Segoe UI" />
+                                          FontFamily="{StaticResource AppContentFont}" />
             </Grid>
         </Border>
 

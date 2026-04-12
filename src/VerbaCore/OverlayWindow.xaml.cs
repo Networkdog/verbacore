@@ -51,7 +51,7 @@ public partial class OverlayWindow : Window
     private static readonly SolidColorBrush ItalicBrush = CreateFrozenBrush(0xD0, 0xCC, 0xDD, 0xFF);
     private static readonly SolidColorBrush CodeFgBrush = CreateFrozenBrush(0xFF, 0xA0, 0xE0, 0xFF);
     private static readonly SolidColorBrush CodeBgBrush = CreateFrozenBrush(0x30, 0xFF, 0xFF, 0xFF);
-    private static readonly FontFamily AppFontFamily = new("AppleSDGothicNeoR00, Segoe UI");
+    private static readonly FontFamily AppFontFamily = (FontFamily)Application.Current.FindResource("AppContentFont");
 
     private static SolidColorBrush CreateFrozenBrush(byte a, byte r, byte g, byte b)
     {
@@ -217,13 +217,18 @@ public partial class OverlayWindow : Window
 
             // Reset UI for new input
             InputDisplay.Text = _grabbedSelectedText ?? "";
+            InputDisplay.FontWeight = FontWeights.Light;
+            InputDisplay.Foreground = new SolidColorBrush(Colors.White);
+            InputDisplay.TextWrapping = TextWrapping.Wrap;
+            InputDisplay.TextTrimming = TextTrimming.CharacterEllipsis;
+            InputDisplay.MaxHeight = 220;
             AdjustInputFontSize(InputDisplay.Text);
             InputDisplay.Visibility = Visibility.Visible;
             InputTextBox.Text = "";
             InputTextBox.Visibility = Visibility.Collapsed;
             ResultViewer.Document = new FlowDocument();
             ResultViewer.Visibility = Visibility.Collapsed;
-            LoadingPanel.Visibility = Visibility.Collapsed;
+            StopLoadingSpinner();
             BlinkingCursor.Visibility = Visibility.Visible;
             HintLabel.Visibility = Visibility.Visible;
             StatusLabel.Text = "CapsLock을 누른 채로 단어를 입력하세요";
@@ -273,7 +278,7 @@ public partial class OverlayWindow : Window
                 BlinkingCursor.Visibility = Visibility.Collapsed;
                 ResultViewer.Document = new FlowDocument();
                 ResultViewer.Visibility = Visibility.Collapsed;
-                LoadingPanel.Visibility = Visibility.Collapsed;
+                StopLoadingSpinner();
                 HintLabel.Visibility = Visibility.Visible;
                 UpdateModeLabel();
 
@@ -409,6 +414,15 @@ public partial class OverlayWindow : Window
     private void AdjustInputFontSize(string text)
     {
         var length = text.Length;
+        var sizePreset = _settingsService.Current.OverlaySize;
+
+        // Font scale factor per overlay size (Small shrinks, Large grows)
+        var fontScale = sizePreset switch
+        {
+            OverlaySize.Small => 0.75,
+            OverlaySize.Large => 1.15,
+            _ => 1.0,
+        };
 
         var (displayFont, textBoxFont, cursorH) = length switch
         {
@@ -418,9 +432,40 @@ public partial class OverlayWindow : Window
             _ => (20.0, 18.0, 24.0),
         };
 
-        InputDisplay.FontSize = displayFont;
-        InputTextBox.FontSize = textBoxFont;
-        BlinkingCursor.Height = cursorH;
+        InputDisplay.FontSize = displayFont * fontScale;
+        InputTextBox.FontSize = textBoxFont * fontScale;
+        BlinkingCursor.Height = cursorH * fontScale;
+    }
+
+    /// <summary>
+    /// When lookup begins, shrinks the input area to a compact single-line summary
+    /// with ellipsis so that the result area gets maximum space.
+    /// </summary>
+    private void CompactInputDisplay(string input)
+    {
+        const int maxDisplayChars = 50;
+        var displayText = input.Length > maxDisplayChars
+            ? string.Concat(input.AsSpan(0, maxDisplayChars), "…")
+            : input;
+
+        var sizeScale = _settingsService.Current.OverlaySize switch
+        {
+            OverlaySize.Small => 0.75,
+            OverlaySize.Large => 1.15,
+            _ => 1.0,
+        };
+
+        InputDisplay.Text = displayText;
+        InputDisplay.FontSize = 18 * sizeScale;
+        InputDisplay.FontWeight = FontWeights.Normal;
+        InputDisplay.Foreground = new SolidColorBrush(Color.FromArgb(0x90, 0xFF, 0xFF, 0xFF));
+        InputDisplay.TextWrapping = TextWrapping.NoWrap;
+        InputDisplay.TextTrimming = TextTrimming.CharacterEllipsis;
+        InputDisplay.MaxHeight = 30 * sizeScale;
+        InputDisplay.Visibility = Visibility.Visible;
+
+        InputTextBox.Visibility = Visibility.Collapsed;
+        BlinkingCursor.Visibility = Visibility.Collapsed;
     }
 
     private bool _userExplicitlySetMode;
@@ -450,9 +495,16 @@ public partial class OverlayWindow : Window
         var ct = _cts.Token;
         _isLookupInProgress = true;
 
+        // Compact input display only for Translate mode (long text → shrink to summary)
+        // Dictionary mode keeps the original large word display
+        if (_currentMode == LookupMode.Translate)
+            CompactInputDisplay(input);
+
         // Show loading indicator until first chunk arrives
         ResultViewer.Visibility = Visibility.Collapsed;
         LoadingPanel.Visibility = Visibility.Visible;
+        var spinnerStoryboard = (Storyboard)LoadingPanel.FindResource("SpinnerStoryboard");
+        spinnerStoryboard.Begin(LoadingPanel, true);
         StatusLabel.Text = "";
 
         var src = _settingsService.Current.SourceLanguage;
@@ -468,7 +520,7 @@ public partial class OverlayWindow : Window
                 if (firstChunk)
                 {
                     firstChunk = false;
-                    LoadingPanel.Visibility = Visibility.Collapsed;
+                    StopLoadingSpinner();
                     ResultViewer.Visibility = Visibility.Visible;
                 }
                 sb.Append(chunk);
@@ -503,7 +555,7 @@ public partial class OverlayWindow : Window
         }
         catch (TaskCanceledException ex) when (ex.InnerException is TimeoutException)
         {
-            LoadingPanel.Visibility = Visibility.Collapsed;
+            StopLoadingSpinner();
             ResultViewer.Visibility = Visibility.Visible;
             RenderMarkdown("## \u23f0 시간 초과\n\n응답 시간이 초과되었습니다. 다시 시도해주세요.");
             StatusLabel.Text = "시간 초과";
@@ -512,11 +564,11 @@ public partial class OverlayWindow : Window
         catch (OperationCanceledException)
         {
             // Cancelled by new CapsLock press
-            LoadingPanel.Visibility = Visibility.Collapsed;
+            StopLoadingSpinner();
         }
         catch (Exception ex)
         {
-            LoadingPanel.Visibility = Visibility.Collapsed;
+            StopLoadingSpinner();
             ResultViewer.Visibility = Visibility.Visible;
             RenderMarkdown($"## \u274c 오류\n\n{ex.Message}\n\nAPI Key와 설정을 확인해주세요.");
             StatusLabel.Text = "오류 발생";
@@ -528,6 +580,13 @@ public partial class OverlayWindow : Window
         }
     }
 
+    private void StopLoadingSpinner()
+    {
+        LoadingPanel.Visibility = Visibility.Collapsed;
+        if (LoadingPanel.FindResource("SpinnerStoryboard") is Storyboard sb)
+            sb.Stop(LoadingPanel);
+    }
+
     private void ResetAutoHideTimer()
     {
         if (_autoHideTimer.IsEnabled)
@@ -537,21 +596,37 @@ public partial class OverlayWindow : Window
         }
     }
 
+    private double GetDpiScale()
+    {
+        var source = PresentationSource.FromVisual(this);
+        return source?.CompositionTarget?.TransformToDevice.M11 ?? 1.0;
+    }
+
     private void ShowOverlay()
     {
         var workArea = SystemParameters.WorkArea;
+        var dpiScale = GetDpiScale();
         var textLength = (_grabbedSelectedText ?? "").Length;
+
+        // Base sizes per OverlaySize setting (in DIPs)
+        var sizePreset = _settingsService.Current.OverlaySize;
+        var (baseW, baseH, longW, longH) = sizePreset switch
+        {
+            OverlaySize.Small  => (540.0, 440.0, 680.0, 560.0),
+            OverlaySize.Large  => (900.0, 740.0, 1100.0, 900.0),
+            _                  => (700.0, 600.0, 900.0, 750.0), // Medium
+        };
 
         // Expand overlay for longer text (e.g. grabbed paragraphs, translation input)
         if (textLength > 100)
         {
-            Width = Math.Min(900, workArea.Width * 0.65);
-            Height = Math.Min(750, workArea.Height * 0.85);
+            Width = Math.Min(longW, workArea.Width * 0.65);
+            Height = Math.Min(longH, workArea.Height * 0.85);
         }
         else
         {
-            Width = Math.Min(700, workArea.Width * 0.5);
-            Height = 600;
+            Width = Math.Min(baseW, workArea.Width * 0.5);
+            Height = Math.Min(baseH, workArea.Height * 0.7);
         }
 
         var pos = _settingsService.Current.PopupPosition;

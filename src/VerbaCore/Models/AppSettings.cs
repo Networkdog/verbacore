@@ -24,6 +24,7 @@ public sealed class AppSettings
     public double WindowWidth { get; set; } = 520;
     public double WindowHeight { get; set; } = 680;
     public OverlayPosition PopupPosition { get; set; } = OverlayPosition.CenterCenter;
+    public OverlaySize OverlaySize { get; set; } = OverlaySize.Medium;
 }
 
 public enum ApiProvider
@@ -54,4 +55,11 @@ public enum ThemeMode
     System,
     Light,
     Dark
+}
+
+public enum OverlaySize
+{
+    Small,
+    Medium,
+    Large
 }

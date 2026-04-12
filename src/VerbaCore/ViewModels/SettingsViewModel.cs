@@ -86,6 +86,9 @@ public partial class SettingsViewModel : ObservableObject
     private string _popupPosition = "가운데";
 
     [ObservableProperty]
+    private string _overlaySize = "중간";
+
+    [ObservableProperty]
     private string _globalHotkey = "Ctrl+Alt+V";
 
     [ObservableProperty]
@@ -101,6 +104,7 @@ public partial class SettingsViewModel : ObservableObject
         "왼쪽 가운데", "가운데", "오른쪽 가운데",
         "왼쪽 아래", "아래 가운데", "오른쪽 아래"
     ];
+    public string[] AvailableSizes { get; } = ["작게", "중간", "크게"];
 
     public SettingsViewModel(SettingsService settingsService)
     {
@@ -161,6 +165,12 @@ public partial class SettingsViewModel : ObservableObject
             OverlayPosition.BottomRight => "오른쪽 아래",
             _ => "가운데"
         };
+        OverlaySize = s.OverlaySize switch
+        {
+            Models.OverlaySize.Small => "작게",
+            Models.OverlaySize.Large => "크게",
+            _ => "중간"
+        };
         UpdateAvailableModels();
     }
 
@@ -219,6 +229,12 @@ public partial class SettingsViewModel : ObservableObject
             "아래 가운데" => OverlayPosition.BottomCenter,
             "오른쪽 아래" => OverlayPosition.BottomRight,
             _ => OverlayPosition.CenterCenter
+        };
+        s.OverlaySize = OverlaySize switch
+        {
+            "작게" => Models.OverlaySize.Small,
+            "크게" => Models.OverlaySize.Large,
+            _ => Models.OverlaySize.Medium
         };
 
         await _settingsService.SaveAsync();

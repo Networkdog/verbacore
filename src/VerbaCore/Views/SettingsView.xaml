@@ -144,6 +144,23 @@
                 </Grid>
             </ui:Card>
 
+            <ui:Card Margin="0,0,0,8">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                        <TextBlock Text="검색창 크기" FontSize="13" />
+                        <TextBlock Text="검색창의 기본 크기를 선택합니다" FontSize="10" Opacity="0.5" />
+                    </StackPanel>
+                    <ComboBox Grid.Column="1"
+                              ItemsSource="{Binding AvailableSizes}"
+                              SelectedItem="{Binding OverlaySize}"
+                              MinWidth="100" />
+                </Grid>
+            </ui:Card>
+
             <!-- System -->
             <TextBlock Text="시스템" FontSize="16" FontWeight="SemiBold" Margin="0,16,0,12" />
 
