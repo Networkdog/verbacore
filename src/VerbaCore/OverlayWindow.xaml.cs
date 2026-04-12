@@ -652,10 +652,12 @@ public partial class OverlayWindow : Window
         BeginAnimation(OpacityProperty, null);
         Opacity = 0;
 
-        if (!IsVisible)
+        // Always Hide+Show so the window moves to the current virtual desktop
+        if (IsVisible)
         {
-            Show();
+            Hide();
         }
+        Show();
 
         Activate();
 
