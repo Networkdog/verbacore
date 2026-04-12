@@ -161,6 +161,9 @@ public partial class OverlayWindow : Window
 
         // TextBox Enter key handler for persistent mode
         InputTextBox.PreviewKeyDown += OnInputTextBoxKeyDown;
+
+        // Adjust font size dynamically as user types in persistent mode
+        InputTextBox.TextChanged += (_, _) => AdjustInputFontSize(InputTextBox.Text);
     }
 
     private void OnInputTextBoxKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
@@ -214,6 +217,7 @@ public partial class OverlayWindow : Window
 
             // Reset UI for new input
             InputDisplay.Text = _grabbedSelectedText ?? "";
+            AdjustInputFontSize(InputDisplay.Text);
             InputDisplay.Visibility = Visibility.Visible;
             InputTextBox.Text = "";
             InputTextBox.Visibility = Visibility.Collapsed;
@@ -264,6 +268,7 @@ public partial class OverlayWindow : Window
                 InputDisplay.Text = "";
                 InputDisplay.Visibility = Visibility.Collapsed;
                 InputTextBox.Text = _grabbedSelectedText ?? "";
+                AdjustInputFontSize(InputTextBox.Text);
                 InputTextBox.Visibility = Visibility.Visible;
                 BlinkingCursor.Visibility = Visibility.Collapsed;
                 ResultViewer.Document = new FlowDocument();
@@ -369,6 +374,7 @@ public partial class OverlayWindow : Window
             }
 
             InputDisplay.Text = buffer;
+            AdjustInputFontSize(buffer);
             UpdateCursorPosition();
         });
     }
@@ -393,6 +399,28 @@ public partial class OverlayWindow : Window
         InputDisplay.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
         var textWidth = InputDisplay.DesiredSize.Width;
         BlinkingCursor.Margin = new Thickness(Math.Min(textWidth + 2, ActualWidth - 100), 0, 0, 8);
+    }
+
+    /// <summary>
+    /// Dynamically adjusts input font size and cursor height based on text length.
+    /// Short text (single word) keeps the large display font; longer text scales down
+    /// progressively so that sentences and paragraphs fit within the overlay.
+    /// </summary>
+    private void AdjustInputFontSize(string text)
+    {
+        var length = text.Length;
+
+        var (displayFont, textBoxFont, cursorH) = length switch
+        {
+            <= 20 => (72.0, 64.0, 80.0),
+            <= 60 => (40.0, 36.0, 46.0),
+            <= 150 => (28.0, 26.0, 32.0),
+            _ => (20.0, 18.0, 24.0),
+        };
+
+        InputDisplay.FontSize = displayFont;
+        InputTextBox.FontSize = textBoxFont;
+        BlinkingCursor.Height = cursorH;
     }
 
     private bool _userExplicitlySetMode;
@@ -512,8 +540,19 @@ public partial class OverlayWindow : Window
     private void ShowOverlay()
     {
         var workArea = SystemParameters.WorkArea;
-        Width = Math.Min(700, workArea.Width * 0.5);
-        Height = 600;
+        var textLength = (_grabbedSelectedText ?? "").Length;
+
+        // Expand overlay for longer text (e.g. grabbed paragraphs, translation input)
+        if (textLength > 100)
+        {
+            Width = Math.Min(900, workArea.Width * 0.65);
+            Height = Math.Min(750, workArea.Height * 0.85);
+        }
+        else
+        {
+            Width = Math.Min(700, workArea.Width * 0.5);
+            Height = 600;
+        }
 
         var pos = _settingsService.Current.PopupPosition;
         var margin = 20.0;

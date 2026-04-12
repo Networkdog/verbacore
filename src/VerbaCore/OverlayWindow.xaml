@@ -65,6 +65,7 @@
                            FontFamily="AppleSDGothicNeoR00, Segoe UI"
                            Foreground="White"
                            TextWrapping="Wrap"
+                           MaxHeight="220"
                            Margin="0,0,0,8" />
 
                 <!-- IME-enabled input for persistent (quick-tap) mode - supports Korean -->
@@ -79,7 +80,9 @@
                          Margin="0,0,0,8"
                          Visibility="Collapsed"
                          AcceptsReturn="False"
-                         TextWrapping="Wrap">
+                         TextWrapping="Wrap"
+                         MaxHeight="220"
+                         ScrollViewer.VerticalScrollBarVisibility="Auto">
                     <TextBox.Style>
                         <Style TargetType="TextBox">
                             <Setter Property="Background" Value="Transparent" />
