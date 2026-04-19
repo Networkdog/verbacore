@@ -7,6 +7,7 @@ using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using Markdig;
 using Markdig.Wpf;
+using VerbaCore.Helpers;
 using VerbaCore.Models;
 using VerbaCore.Services;
 
@@ -40,6 +41,8 @@ public partial class OverlayWindow : Window
     private string? _grabbedSelectedText;
     /// <summary>True while an API lookup is actively streaming.</summary>
     private bool _isLookupInProgress;
+    /// <summary>Guard flag: suppresses Deactivated during show/activate sequences to prevent flicker.</summary>
+    private bool _isActivating;
 
     private static readonly MarkdownPipeline MarkdownPipeline = new MarkdownPipelineBuilder()
         .UseSupportedExtensions()
@@ -97,9 +100,10 @@ public partial class OverlayWindow : Window
 
         // Close overlay when it loses focus (user clicked outside)
         // Don't auto-close during an active API lookup — user can still Esc/CapsLock to close
+        // Don't auto-close while activating (ForceActivate may cause transient focus loss)
         Deactivated += (_, _) =>
         {
-            if (_isShown && !_isLookupInProgress)
+            if (_isShown && !_isLookupInProgress && !_isActivating)
                 HideOverlay();
         };
 
@@ -287,10 +291,11 @@ public partial class OverlayWindow : Window
                     ShowOverlay();
                 }
 
-                // Focus the TextBox for IME input
-                Activate();
+                // Focus the TextBox for IME input — use ForceActivate to steal focus from other apps
+                ForceActivate();
                 Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Input, () =>
                 {
+                    ForceActivate();
                     InputTextBox.Focus();
                     System.Windows.Input.Keyboard.Focus(InputTextBox);
                     // Select all so typing replaces the pre-filled text
@@ -602,6 +607,46 @@ public partial class OverlayWindow : Window
         return source?.CompositionTarget?.TransformToDevice.M11 ?? 1.0;
     }
 
+    /// <summary>
+    /// Forces the overlay to the foreground using Win32 AttachThreadInput trick.
+    /// WPF's Activate() alone may fail when another app holds foreground lock.
+    /// Sets <see cref="_isActivating"/> to suppress Deactivated during the process.
+    /// </summary>
+    private void ForceActivate()
+    {
+        _isActivating = true;
+        try
+        {
+            var hwnd = new System.Windows.Interop.WindowInteropHelper(this).Handle;
+            if (hwnd == IntPtr.Zero) return;
+
+            var foregroundHwnd = NativeMethods.GetForegroundWindow();
+            if (foregroundHwnd != IntPtr.Zero && foregroundHwnd != hwnd)
+            {
+                var foregroundThread = NativeMethods.GetWindowThreadProcessId(foregroundHwnd, out _);
+                var currentThread = NativeMethods.GetCurrentThreadId();
+
+                if (foregroundThread != currentThread)
+                {
+                    NativeMethods.AttachThreadInput(foregroundThread, currentThread, true);
+                    NativeMethods.SetForegroundWindow(hwnd);
+                    NativeMethods.AttachThreadInput(foregroundThread, currentThread, false);
+                }
+                else
+                {
+                    NativeMethods.SetForegroundWindow(hwnd);
+                }
+            }
+
+            Activate();
+        }
+        finally
+        {
+            // Clear the guard after a short delay so any queued Deactivated events are suppressed
+            Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background, () => _isActivating = false);
+        }
+    }
+
     private void ShowOverlay()
     {
         var workArea = SystemParameters.WorkArea;
@@ -647,6 +692,7 @@ public partial class OverlayWindow : Window
         };
 
         _isShown = true;
+        _isActivating = true;
 
         // Use Window.Opacity for fade — immune to WPF-UI theme changes
         BeginAnimation(OpacityProperty, null);
@@ -659,7 +705,7 @@ public partial class OverlayWindow : Window
         }
         Show();
 
-        Activate();
+        ForceActivate();
 
         var fadeIn = new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(120));
         fadeIn.FillBehavior = FillBehavior.Stop;

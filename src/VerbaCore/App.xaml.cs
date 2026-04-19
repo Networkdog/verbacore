@@ -123,13 +123,34 @@ public partial class App : Application
 
         _trayIcon = new System.Windows.Forms.NotifyIcon
         {
-            Icon = SystemIcons.Application,
+            Icon = LoadTrayIcon(),
             Text = "VerbaCore — CapsLock으로 AI 사전/번역",
             Visible = true,
             ContextMenuStrip = contextMenu
         };
 
         _trayIcon.DoubleClick += (_, _) => ShowSettingsWindow();
+    }
+
+    private static Icon LoadTrayIcon()
+    {
+        // Look for icon.png next to the exe first, then fall back to project-relative path
+        var exeDir = AppContext.BaseDirectory;
+        var candidates = new[]
+        {
+            System.IO.Path.Combine(exeDir, "res", "icons", "verbacore.png"),
+            System.IO.Path.Combine(exeDir, "..", "..", "..", "..", "..", "res", "icons", "verbacore.png"),
+        };
+
+        foreach (var path in candidates)
+        {
+            if (!System.IO.File.Exists(path)) continue;
+            using var bmp = new Bitmap(path);
+            var hIcon = bmp.GetHicon();
+            return Icon.FromHandle(hIcon);
+        }
+
+        return SystemIcons.Application;
     }
 
     private void ShowSettingsWindow()

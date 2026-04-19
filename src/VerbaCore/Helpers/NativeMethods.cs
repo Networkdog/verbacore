@@ -79,6 +79,20 @@ internal static class NativeMethods
         keybd_event((byte)VK_CAPITAL, 0x45, KEYEVENTF_KEYUP, UIntPtr.Zero);
     }
 
+    // Foreground window / thread attachment (for forcing focus)
+    [DllImport("user32.dll")]
+    public static extern IntPtr GetForegroundWindow();
+
+    [DllImport("user32.dll")]
+    public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
+
+    [DllImport("kernel32.dll")]
+    public static extern uint GetCurrentThreadId();
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, bool fAttach);
+
     // Shell tray icon
     [DllImport("shell32.dll")]
     public static extern IntPtr ExtractIcon(IntPtr hInst, string lpszExeFileName, int nIconIndex);
