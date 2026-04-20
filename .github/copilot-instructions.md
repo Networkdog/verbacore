@@ -41,11 +41,10 @@ src/VerbaCore/
 │   ├── PromptBuilder.cs       — Mode-specific prompt templates
 │   ├── SettingsService.cs     — JSON settings with DPAPI encryption
 │   ├── HistoryService.cs      — JSON history storage
-│   ├── ClipboardMonitorService.cs — Win32 clipboard monitoring
 │   ├── SpeechInputService.cs  — System.Speech voice input
 │   └── CursorTextService.cs   — UI Automation cursor text extraction
 └── Helpers/
-    ├── NativeMethods.cs       — Win32 P/Invoke (keyboard hook, clipboard, etc.)
+    ├── NativeMethods.cs       — Win32 P/Invoke (keyboard hook, etc.)
     └── Converters.cs          — XAML value converters
 ```
 
@@ -67,8 +66,7 @@ src/VerbaCore/
 3. **Azure OpenAI**: Uses `api-key` header auth and `/openai/deployments/{name}/chat/completions?api-version=` URL format.
 4. **Overlay window**: Borderless, transparent `Window` with `AllowsTransparency="True"`. Fade in/out animations. Shows input in large text, results in smaller text below.
 5. **System tray**: `System.Windows.Forms.NotifyIcon` with context menu. App uses `ShutdownMode="OnExplicitShutdown"`.
-6. **Clipboard monitoring**: Win32 `AddClipboardFormatListener` + `WM_CLIPBOARDUPDATE`
-7. **Voice input**: `System.Speech.Recognition.SpeechRecognitionEngine` with dictation grammar
+6. **Voice input**: `System.Speech.Recognition.SpeechRecognitionEngine` with dictation grammar
 
 ## Build & Run
 ```bash
