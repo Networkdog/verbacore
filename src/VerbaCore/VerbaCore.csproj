@@ -11,6 +11,9 @@
     <RootNamespace>VerbaCore</RootNamespace>
     <TieredCompilation>true</TieredCompilation>
     <TieredPGO>true</TieredPGO>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+    <ApplicationIcon>..\..\res\icons\verbacore.ico</ApplicationIcon>
 
     <!-- Product metadata -->
     <Product>VerbaCore</Product>
@@ -29,6 +32,12 @@
     <PackageReference Include="NHotkey.Wpf" Version="4.0.0" />
     <PackageReference Include="System.Speech" Version="10.0.5" />
     <PackageReference Include="WPF-UI" Version="3.0.5" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="..\..\res\icons\verbacore.png" Link="res\icons\verbacore.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 
 </Project>

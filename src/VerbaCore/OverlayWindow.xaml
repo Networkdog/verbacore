@@ -14,7 +14,7 @@
 
     <Grid x:Name="RootGrid">
         <!-- Semi-transparent backdrop -->
-        <Border Background="#CC1A1A2E"
+        <Border Background="#CC1A1A1A"
                 CornerRadius="16"
                 Margin="20">
             <Border.Effect>
@@ -34,23 +34,23 @@
                     <TextBlock x:Name="ModeLabel"
                                Text="📖 사전"
                                FontSize="15"
-                               FontFamily="AppleSDGothicNeoR00, Segoe UI"
+                               FontFamily="{StaticResource AppUIFont}"
                                Foreground="#80FFFFFF"
                                VerticalAlignment="Center" />
                     <TextBlock Text="  ·  "
                                FontSize="15"
-                               FontFamily="AppleSDGothicNeoR00, Segoe UI"
+                               FontFamily="{StaticResource AppUIFont}"
                                Foreground="#40FFFFFF"
                                VerticalAlignment="Center" />
                     <TextBlock x:Name="LangLabel"
                                Text="EN → KO"
                                FontSize="15"
-                               FontFamily="AppleSDGothicNeoR00, Segoe UI"
+                               FontFamily="{StaticResource AppUIFont}"
                                Foreground="#80FFFFFF"
                                VerticalAlignment="Center" />
                     <TextBlock Text="  ·  Tab: 모드 전환"
                                FontSize="15"
-                               FontFamily="AppleSDGothicNeoR00, Segoe UI"
+                               FontFamily="{StaticResource AppUIFont}"
                                Foreground="#40FFFFFF"
                                VerticalAlignment="Center"
                                x:Name="HintLabel" />
@@ -62,9 +62,11 @@
                            Text=""
                            FontSize="72"
                            FontWeight="Light"
-                           FontFamily="AppleSDGothicNeoR00, Segoe UI"
+                           FontFamily="{StaticResource AppContentFont}"
                            Foreground="White"
                            TextWrapping="Wrap"
+                           TextTrimming="CharacterEllipsis"
+                           MaxHeight="220"
                            Margin="0,0,0,8" />
 
                 <!-- IME-enabled input for persistent (quick-tap) mode - supports Korean -->
@@ -72,14 +74,16 @@
                          x:Name="InputTextBox"
                          FontSize="64"
                          FontWeight="Light"
-                         FontFamily="AppleSDGothicNeoR00, Segoe UI"
+                         FontFamily="{StaticResource AppContentFont}"
                          Foreground="White"
                          CaretBrush="White"
                          SelectionBrush="#5500AAFF"
                          Margin="0,0,0,8"
                          Visibility="Collapsed"
                          AcceptsReturn="False"
-                         TextWrapping="Wrap">
+                         TextWrapping="Wrap"
+                         MaxHeight="220"
+                         ScrollViewer.VerticalScrollBarVisibility="Auto">
                     <TextBox.Style>
                         <Style TargetType="TextBox">
                             <Setter Property="Background" Value="Transparent" />
@@ -119,7 +123,7 @@
                               Background="Transparent"
                               Foreground="#E0FFFFFF"
                               FontSize="16"
-                              FontFamily="AppleSDGothicNeoR00, Segoe UI"
+                              FontFamily="{StaticResource AppContentFont}"
                               FontWeight="Regular"
                               IsToolBarVisible="False" />
 
@@ -129,15 +133,27 @@
                             Visibility="Collapsed"
                             HorizontalAlignment="Center"
                             VerticalAlignment="Center">
-                    <TextBlock Text="⏳"
-                               FontSize="48"
-                               HorizontalAlignment="Center" />
-                    <TextBlock Text="조회 중..."
-                               FontSize="26"
-                               FontFamily="AppleSDGothicNeoR00, Segoe UI"
-                               Foreground="#80FFFFFF"
-                               HorizontalAlignment="Center"
-                               Margin="0,8,0,0" />
+                    <StackPanel.Resources>
+                        <Storyboard x:Key="SpinnerStoryboard">
+                            <DoubleAnimation Storyboard.TargetName="SpinnerRotation"
+                                             Storyboard.TargetProperty="Angle"
+                                             From="0" To="360"
+                                             Duration="0:0:1"
+                                             RepeatBehavior="Forever" />
+                        </Storyboard>
+                    </StackPanel.Resources>
+                    <!-- Rotating arc spinner -->
+                    <Ellipse Width="44" Height="44"
+                             StrokeThickness="3"
+                             Stroke="#B0FFFFFF"
+                             StrokeDashArray="2.5 5"
+                             StrokeDashCap="Round"
+                             HorizontalAlignment="Center"
+                             RenderTransformOrigin="0.5,0.5">
+                        <Ellipse.RenderTransform>
+                            <RotateTransform x:Name="SpinnerRotation" Angle="0" />
+                        </Ellipse.RenderTransform>
+                    </Ellipse>
                 </StackPanel>
 
                 <!-- Status -->
@@ -145,7 +161,7 @@
                            x:Name="StatusLabel"
                            Text="CapsLock을 누른 채로 단어를 입력하세요"
                            FontSize="15"
-                           FontFamily="AppleSDGothicNeoR00, Segoe UI"
+                           FontFamily="{StaticResource AppUIFont}"
                            Foreground="#50FFFFFF"
                            HorizontalAlignment="Center"
                            Margin="0,8,0,0" />

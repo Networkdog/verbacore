@@ -80,7 +80,16 @@ public partial class App : Application
 
         // Apply saved settings
         ApplyTheme(settings.Current.Theme);
-        ApplyStartWithWindows(settings.Current.StartWithWindows);
+
+        if (settings.IsFirstRun)
+        {
+            // On first run, sync from registry so installer's choice is preserved
+            settings.Current.StartWithWindows = IsStartWithWindowsInRegistry();
+        }
+        else
+        {
+            ApplyStartWithWindows(settings.Current.StartWithWindows);
+        }
 
         // Create overlay window (hidden by default)
         _capsLockService = GetService<CapsLockService>();
@@ -118,13 +127,34 @@ public partial class App : Application
 
         _trayIcon = new System.Windows.Forms.NotifyIcon
         {
-            Icon = SystemIcons.Application,
+            Icon = LoadTrayIcon(),
             Text = "VerbaCore — CapsLock으로 AI 사전/번역",
             Visible = true,
             ContextMenuStrip = contextMenu
         };
 
         _trayIcon.DoubleClick += (_, _) => ShowSettingsWindow();
+    }
+
+    private static Icon LoadTrayIcon()
+    {
+        // Look for icon.png next to the exe first, then fall back to project-relative path
+        var exeDir = AppContext.BaseDirectory;
+        var candidates = new[]
+        {
+            System.IO.Path.Combine(exeDir, "res", "icons", "verbacore.png"),
+            System.IO.Path.Combine(exeDir, "..", "..", "..", "..", "..", "res", "icons", "verbacore.png"),
+        };
+
+        foreach (var path in candidates)
+        {
+            if (!System.IO.File.Exists(path)) continue;
+            using var bmp = new Bitmap(path);
+            var hIcon = bmp.GetHicon();
+            return Icon.FromHandle(hIcon);
+        }
+
+        return SystemIcons.Application;
     }
 
     private void ShowSettingsWindow()
@@ -202,6 +232,14 @@ public partial class App : Application
         {
             key.DeleteValue(appName, throwOnMissingValue: false);
         }
+    }
+
+    private static bool IsStartWithWindowsInRegistry()
+    {
+        const string appName = "VerbaCore";
+        using var key = Registry.CurrentUser.OpenSubKey(
+            @"Software\Microsoft\Windows\CurrentVersion\Run");
+        return key?.GetValue(appName) is not null;
     }
 
     private static string? GetAppExePath()

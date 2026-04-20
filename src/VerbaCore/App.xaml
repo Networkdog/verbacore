@@ -19,6 +19,11 @@
             <helpers:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
             <helpers:ZeroToVisibilityConverter x:Key="ZeroToVisibilityConverter" />
             <helpers:BoolToAzureKeyPlaceholderConverter x:Key="BoolToAzureKeyPlaceholderConverter" />
+
+            <!-- App-wide font families (change here to update everywhere) -->
+            <FontFamily x:Key="AppUIFont">Noto Sans KR, AppleSDGothicNeoL00, Segoe UI</FontFamily>
+            <FontFamily x:Key="AppContentFont">Noto Sans Light, AppleSDGothicNeoL00, Segoe UI</FontFamily>
+            <FontFamily x:Key="AppCodeFont">Cascadia Code, Consolas, monospace</FontFamily>
         </ResourceDictionary>
     </Application.Resources>
 </Application>

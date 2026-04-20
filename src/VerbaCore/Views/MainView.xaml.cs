@@ -19,7 +19,7 @@ public partial class MainView : UserControl
         .UseSupportedExtensions()
         .Build();
 
-    private static readonly FontFamily AppFont = new("AppleSDGothicNeoR00, Segoe UI");
+    private static readonly FontFamily AppFont = (FontFamily)Application.Current.FindResource("AppContentFont");
     private const double BaseFontSize = 14.0;
     private const int RenderThrottleMs = 200;
 
@@ -242,7 +242,7 @@ public partial class MainView : UserControl
             // Inline code
             run.Foreground = c.CodeFg;
             run.Background = c.CodeBg;
-            run.FontFamily = new FontFamily("Cascadia Code, Consolas, monospace");
+            run.FontFamily = (FontFamily)Application.Current.FindResource("AppCodeFont");
         }
         else if (inline is Span span)
         {

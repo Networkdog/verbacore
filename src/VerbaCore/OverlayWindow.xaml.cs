@@ -7,6 +7,7 @@ using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using Markdig;
 using Markdig.Wpf;
+using VerbaCore.Helpers;
 using VerbaCore.Models;
 using VerbaCore.Services;
 
@@ -40,6 +41,8 @@ public partial class OverlayWindow : Window
     private string? _grabbedSelectedText;
     /// <summary>True while an API lookup is actively streaming.</summary>
     private bool _isLookupInProgress;
+    /// <summary>Guard flag: suppresses Deactivated during show/activate sequences to prevent flicker.</summary>
+    private bool _isActivating;
 
     private static readonly MarkdownPipeline MarkdownPipeline = new MarkdownPipelineBuilder()
         .UseSupportedExtensions()
@@ -51,7 +54,7 @@ public partial class OverlayWindow : Window
     private static readonly SolidColorBrush ItalicBrush = CreateFrozenBrush(0xD0, 0xCC, 0xDD, 0xFF);
     private static readonly SolidColorBrush CodeFgBrush = CreateFrozenBrush(0xFF, 0xA0, 0xE0, 0xFF);
     private static readonly SolidColorBrush CodeBgBrush = CreateFrozenBrush(0x30, 0xFF, 0xFF, 0xFF);
-    private static readonly FontFamily AppFontFamily = new("AppleSDGothicNeoR00, Segoe UI");
+    private static readonly FontFamily AppFontFamily = (FontFamily)Application.Current.FindResource("AppContentFont");
 
     private static SolidColorBrush CreateFrozenBrush(byte a, byte r, byte g, byte b)
     {
@@ -96,11 +99,10 @@ public partial class OverlayWindow : Window
         _capsLockService.EnterPressed += OnEnterPressed;
 
         // Close overlay when it loses focus (user clicked outside)
-        // Don't auto-close during an active API lookup or while viewing results —
-        // user may be switching windows temporarily. Only close during input phase.
+        // Don't auto-close during an active API lookup — user can still Esc/CapsLock to close
         Deactivated += (_, _) =>
         {
-            if (_isShown && !_isLookupInProgress && ResultViewer.Visibility != Visibility.Visible)
+            if (_isShown && !_isLookupInProgress)
                 HideOverlay();
         };
 
@@ -162,6 +164,9 @@ public partial class OverlayWindow : Window
 
         // TextBox Enter key handler for persistent mode
         InputTextBox.PreviewKeyDown += OnInputTextBoxKeyDown;
+
+        // Adjust font size dynamically as user types in persistent mode
+        InputTextBox.TextChanged += (_, _) => AdjustInputFontSize(InputTextBox.Text);
     }
 
     private void OnInputTextBoxKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
@@ -215,12 +220,18 @@ public partial class OverlayWindow : Window
 
             // Reset UI for new input
             InputDisplay.Text = _grabbedSelectedText ?? "";
+            InputDisplay.FontWeight = FontWeights.Light;
+            InputDisplay.Foreground = new SolidColorBrush(Colors.White);
+            InputDisplay.TextWrapping = TextWrapping.Wrap;
+            InputDisplay.TextTrimming = TextTrimming.CharacterEllipsis;
+            InputDisplay.MaxHeight = 220;
+            AdjustInputFontSize(InputDisplay.Text);
             InputDisplay.Visibility = Visibility.Visible;
             InputTextBox.Text = "";
             InputTextBox.Visibility = Visibility.Collapsed;
             ResultViewer.Document = new FlowDocument();
             ResultViewer.Visibility = Visibility.Collapsed;
-            LoadingPanel.Visibility = Visibility.Collapsed;
+            StopLoadingSpinner();
             BlinkingCursor.Visibility = Visibility.Visible;
             HintLabel.Visibility = Visibility.Visible;
             StatusLabel.Text = "CapsLock을 누른 채로 단어를 입력하세요";
@@ -265,11 +276,12 @@ public partial class OverlayWindow : Window
                 InputDisplay.Text = "";
                 InputDisplay.Visibility = Visibility.Collapsed;
                 InputTextBox.Text = _grabbedSelectedText ?? "";
+                AdjustInputFontSize(InputTextBox.Text);
                 InputTextBox.Visibility = Visibility.Visible;
                 BlinkingCursor.Visibility = Visibility.Collapsed;
                 ResultViewer.Document = new FlowDocument();
                 ResultViewer.Visibility = Visibility.Collapsed;
-                LoadingPanel.Visibility = Visibility.Collapsed;
+                StopLoadingSpinner();
                 HintLabel.Visibility = Visibility.Visible;
                 UpdateModeLabel();
 
@@ -278,10 +290,11 @@ public partial class OverlayWindow : Window
                     ShowOverlay();
                 }
 
-                // Focus the TextBox for IME input
-                Activate();
+                // Focus the TextBox for IME input — use ForceActivate to steal focus from other apps
+                ForceActivate();
                 Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Input, () =>
                 {
+                    ForceActivate();
                     InputTextBox.Focus();
                     System.Windows.Input.Keyboard.Focus(InputTextBox);
                     // Select all so typing replaces the pre-filled text
@@ -370,6 +383,7 @@ public partial class OverlayWindow : Window
             }
 
             InputDisplay.Text = buffer;
+            AdjustInputFontSize(buffer);
             UpdateCursorPosition();
         });
     }
@@ -394,6 +408,68 @@ public partial class OverlayWindow : Window
         InputDisplay.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
         var textWidth = InputDisplay.DesiredSize.Width;
         BlinkingCursor.Margin = new Thickness(Math.Min(textWidth + 2, ActualWidth - 100), 0, 0, 8);
+    }
+
+    /// <summary>
+    /// Dynamically adjusts input font size and cursor height based on text length.
+    /// Short text (single word) keeps the large display font; longer text scales down
+    /// progressively so that sentences and paragraphs fit within the overlay.
+    /// </summary>
+    private void AdjustInputFontSize(string text)
+    {
+        var length = text.Length;
+        var sizePreset = _settingsService.Current.OverlaySize;
+
+        // Font scale factor per overlay size (Small shrinks, Large grows)
+        var fontScale = sizePreset switch
+        {
+            OverlaySize.Small => 0.75,
+            OverlaySize.Large => 1.15,
+            _ => 1.0,
+        };
+
+        var (displayFont, textBoxFont, cursorH) = length switch
+        {
+            <= 20 => (72.0, 64.0, 80.0),
+            <= 60 => (40.0, 36.0, 46.0),
+            <= 150 => (28.0, 26.0, 32.0),
+            _ => (20.0, 18.0, 24.0),
+        };
+
+        InputDisplay.FontSize = displayFont * fontScale;
+        InputTextBox.FontSize = textBoxFont * fontScale;
+        BlinkingCursor.Height = cursorH * fontScale;
+    }
+
+    /// <summary>
+    /// When lookup begins, shrinks the input area to a compact single-line summary
+    /// with ellipsis so that the result area gets maximum space.
+    /// </summary>
+    private void CompactInputDisplay(string input)
+    {
+        const int maxDisplayChars = 50;
+        var displayText = input.Length > maxDisplayChars
+            ? string.Concat(input.AsSpan(0, maxDisplayChars), "…")
+            : input;
+
+        var sizeScale = _settingsService.Current.OverlaySize switch
+        {
+            OverlaySize.Small => 0.75,
+            OverlaySize.Large => 1.15,
+            _ => 1.0,
+        };
+
+        InputDisplay.Text = displayText;
+        InputDisplay.FontSize = 18 * sizeScale;
+        InputDisplay.FontWeight = FontWeights.Normal;
+        InputDisplay.Foreground = new SolidColorBrush(Color.FromArgb(0x90, 0xFF, 0xFF, 0xFF));
+        InputDisplay.TextWrapping = TextWrapping.NoWrap;
+        InputDisplay.TextTrimming = TextTrimming.CharacterEllipsis;
+        InputDisplay.MaxHeight = 30 * sizeScale;
+        InputDisplay.Visibility = Visibility.Visible;
+
+        InputTextBox.Visibility = Visibility.Collapsed;
+        BlinkingCursor.Visibility = Visibility.Collapsed;
     }
 
     private bool _userExplicitlySetMode;
@@ -439,9 +515,16 @@ public partial class OverlayWindow : Window
         var ct = _cts.Token;
         _isLookupInProgress = true;
 
+        // Compact input display only for Translate mode (long text → shrink to summary)
+        // Dictionary mode keeps the original large word display
+        if (_currentMode == LookupMode.Translate)
+            CompactInputDisplay(input);
+
         // Show loading indicator until first chunk arrives
         ResultViewer.Visibility = Visibility.Collapsed;
         LoadingPanel.Visibility = Visibility.Visible;
+        var spinnerStoryboard = (Storyboard)LoadingPanel.FindResource("SpinnerStoryboard");
+        spinnerStoryboard.Begin(LoadingPanel, true);
         StatusLabel.Text = "";
 
         var src = _settingsService.Current.SourceLanguage;
@@ -457,7 +540,7 @@ public partial class OverlayWindow : Window
                 if (firstChunk)
                 {
                     firstChunk = false;
-                    LoadingPanel.Visibility = Visibility.Collapsed;
+                    StopLoadingSpinner();
                     ResultViewer.Visibility = Visibility.Visible;
                 }
                 sb.Append(chunk);
@@ -492,7 +575,7 @@ public partial class OverlayWindow : Window
         }
         catch (TaskCanceledException ex) when (ex.InnerException is TimeoutException)
         {
-            LoadingPanel.Visibility = Visibility.Collapsed;
+            StopLoadingSpinner();
             ResultViewer.Visibility = Visibility.Visible;
             RenderMarkdown("## \u23f0 시간 초과\n\n응답 시간이 초과되었습니다. 다시 시도해주세요.");
             StatusLabel.Text = "시간 초과";
@@ -501,11 +584,11 @@ public partial class OverlayWindow : Window
         catch (OperationCanceledException)
         {
             // Cancelled by new CapsLock press
-            LoadingPanel.Visibility = Visibility.Collapsed;
+            StopLoadingSpinner();
         }
         catch (Exception ex)
         {
-            LoadingPanel.Visibility = Visibility.Collapsed;
+            StopLoadingSpinner();
             ResultViewer.Visibility = Visibility.Visible;
             RenderMarkdown($"## \u274c 오류\n\n{ex.Message}\n\nAPI Key와 설정을 확인해주세요.");
             StatusLabel.Text = "오류 발생";
@@ -517,6 +600,13 @@ public partial class OverlayWindow : Window
         }
     }
 
+    private void StopLoadingSpinner()
+    {
+        LoadingPanel.Visibility = Visibility.Collapsed;
+        if (LoadingPanel.FindResource("SpinnerStoryboard") is Storyboard sb)
+            sb.Stop(LoadingPanel);
+    }
+
     private void ResetAutoHideTimer()
     {
         if (_autoHideTimer.IsEnabled)
@@ -526,11 +616,78 @@ public partial class OverlayWindow : Window
         }
     }
 
+    private double GetDpiScale()
+    {
+        var source = PresentationSource.FromVisual(this);
+        return source?.CompositionTarget?.TransformToDevice.M11 ?? 1.0;
+    }
+
+    /// <summary>
+    /// Forces the overlay to the foreground using Win32 AttachThreadInput trick.
+    /// WPF's Activate() alone may fail when another app holds foreground lock.
+    /// Sets <see cref="_isActivating"/> to suppress Deactivated during the process.
+    /// </summary>
+    private void ForceActivate()
+    {
+        _isActivating = true;
+        try
+        {
+            var hwnd = new System.Windows.Interop.WindowInteropHelper(this).Handle;
+            if (hwnd == IntPtr.Zero) return;
+
+            var foregroundHwnd = NativeMethods.GetForegroundWindow();
+            if (foregroundHwnd != IntPtr.Zero && foregroundHwnd != hwnd)
+            {
+                var foregroundThread = NativeMethods.GetWindowThreadProcessId(foregroundHwnd, out _);
+                var currentThread = NativeMethods.GetCurrentThreadId();
+
+                if (foregroundThread != currentThread)
+                {
+                    NativeMethods.AttachThreadInput(foregroundThread, currentThread, true);
+                    NativeMethods.SetForegroundWindow(hwnd);
+                    NativeMethods.AttachThreadInput(foregroundThread, currentThread, false);
+                }
+                else
+                {
+                    NativeMethods.SetForegroundWindow(hwnd);
+                }
+            }
+
+            Activate();
+        }
+        finally
+        {
+            // Clear the guard after a short delay so any queued Deactivated events are suppressed
+            Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background, () => _isActivating = false);
+        }
+    }
+
     private void ShowOverlay()
     {
         var workArea = SystemParameters.WorkArea;
-        Width = Math.Min(700, workArea.Width * 0.5);
-        Height = 600;
+        var dpiScale = GetDpiScale();
+        var textLength = (_grabbedSelectedText ?? "").Length;
+
+        // Base sizes per OverlaySize setting (in DIPs)
+        var sizePreset = _settingsService.Current.OverlaySize;
+        var (baseW, baseH, longW, longH) = sizePreset switch
+        {
+            OverlaySize.Small  => (540.0, 440.0, 680.0, 560.0),
+            OverlaySize.Large  => (900.0, 740.0, 1100.0, 900.0),
+            _                  => (700.0, 600.0, 900.0, 750.0), // Medium
+        };
+
+        // Expand overlay for longer text (e.g. grabbed paragraphs, translation input)
+        if (textLength > 100)
+        {
+            Width = Math.Min(longW, workArea.Width * 0.65);
+            Height = Math.Min(longH, workArea.Height * 0.85);
+        }
+        else
+        {
+            Width = Math.Min(baseW, workArea.Width * 0.5);
+            Height = Math.Min(baseH, workArea.Height * 0.7);
+        }
 
         var pos = _settingsService.Current.PopupPosition;
         var margin = 20.0;
@@ -550,17 +707,20 @@ public partial class OverlayWindow : Window
         };
 
         _isShown = true;
+        _isActivating = true;
 
         // Use Window.Opacity for fade — immune to WPF-UI theme changes
         BeginAnimation(OpacityProperty, null);
         Opacity = 0;
 
-        if (!IsVisible)
+        // Always Hide+Show so the window moves to the current virtual desktop
+        if (IsVisible)
         {
-            Show();
+            Hide();
         }
+        Show();
 
-        Activate();
+        ForceActivate();
 
         var fadeIn = new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(120));
         fadeIn.FillBehavior = FillBehavior.Stop;
