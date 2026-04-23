@@ -41,11 +41,10 @@ src/VerbaCore/
 │   ├── PromptBuilder.cs       — Mode-specific prompt templates
 │   ├── SettingsService.cs     — JSON settings with DPAPI encryption
 │   ├── HistoryService.cs      — JSON history storage
-│   ├── ClipboardMonitorService.cs — Win32 clipboard monitoring
 │   ├── SpeechInputService.cs  — System.Speech voice input
 │   └── CursorTextService.cs   — UI Automation cursor text extraction
 └── Helpers/
-    ├── NativeMethods.cs       — Win32 P/Invoke (keyboard hook, clipboard, etc.)
+    ├── NativeMethods.cs       — Win32 P/Invoke (keyboard hook, etc.)
     └── Converters.cs          — XAML value converters
 ```
 
@@ -67,8 +66,7 @@ src/VerbaCore/
 3. **Azure OpenAI**: Uses `api-key` header auth and `/openai/deployments/{name}/chat/completions?api-version=` URL format.
 4. **Overlay window**: Borderless, transparent `Window` with `AllowsTransparency="True"`. Fade in/out animations. Shows input in large text, results in smaller text below.
 5. **System tray**: `System.Windows.Forms.NotifyIcon` with context menu. App uses `ShutdownMode="OnExplicitShutdown"`.
-6. **Clipboard monitoring**: Win32 `AddClipboardFormatListener` + `WM_CLIPBOARDUPDATE`
-7. **Voice input**: `System.Speech.Recognition.SpeechRecognitionEngine` with dictation grammar
+6. **Voice input**: `System.Speech.Recognition.SpeechRecognitionEngine` with dictation grammar
 
 ## Element Glossary (공식 명칭)
 모든 기능, 창, 모듈, 단축키 등에는 아래 공식 명칭을 사용한다. 대화에서 이 이름을 기준으로 소통하며, 새로운 요소가 추가될 때도 반드시 이름을 부여하고 이 섹션에 등록한다.

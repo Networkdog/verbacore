@@ -83,6 +83,22 @@ public sealed class CapsLockService : IDisposable
 
     private IntPtr HookCallback(int nCode, IntPtr wParam, IntPtr lParam)
     {
+        try
+        {
+            return HookCallbackCore(nCode, wParam, lParam);
+        }
+        catch (Exception ex)
+        {
+            // Never let exceptions propagate out of the hook callback —
+            // doing so would cause Windows to silently remove the hook,
+            // breaking CapsLock interception and potentially crashing the app.
+            System.Diagnostics.Debug.WriteLine($"[CapsLockService] Hook exception: {ex}");
+            return NativeMethods.CallNextHookEx(_hookId, nCode, wParam, lParam);
+        }
+    }
+
+    private IntPtr HookCallbackCore(int nCode, IntPtr wParam, IntPtr lParam)
+    {
         if (nCode >= 0)
         {
             var hookStruct = Marshal.PtrToStructure<NativeMethods.KBDLLHOOKSTRUCT>(lParam);

@@ -107,10 +107,9 @@ public partial class OverlayWindow : Window
 
         // Close overlay when it loses focus (user clicked outside)
         // Don't auto-close during an active API lookup — user can still Esc/CapsLock to close
-        // Don't auto-close while activating (ForceActivate may cause transient focus loss)
         Deactivated += (_, _) =>
         {
-            if (_isShown && !_isLookupInProgress && !_isActivating)
+            if (_isShown && !_isLookupInProgress)
                 HideOverlay();
         };
 
@@ -188,7 +187,7 @@ public partial class OverlayWindow : Window
                 _cursorBlinkTimer.Stop();
                 BlinkingCursor.Visibility = Visibility.Collapsed;
                 HintLabel.Visibility = Visibility.Collapsed;
-                _ = PerformLookupAsync(input);
+                SafePerformLookup(input);
             }
         }
         else if (e.Key == System.Windows.Input.Key.Escape)
@@ -339,7 +338,7 @@ public partial class OverlayWindow : Window
             }
 
             // Trigger lookup
-            _ = PerformLookupAsync(input);
+            SafePerformLookup(input);
         });
     }
 
@@ -357,7 +356,7 @@ public partial class OverlayWindow : Window
                 if (!string.IsNullOrEmpty(input))
                 {
                     HintLabel.Visibility = Visibility.Collapsed;
-                    _ = PerformLookupAsync(input);
+                    SafePerformLookup(input);
                 }
                 return;
             }
@@ -369,7 +368,7 @@ public partial class OverlayWindow : Window
             var bufferInput = _capsLockService.Buffer.Trim();
             if (string.IsNullOrEmpty(bufferInput)) return;
 
-            _ = PerformLookupAsync(bufferInput);
+            SafePerformLookup(bufferInput);
         });
     }
 
@@ -481,6 +480,22 @@ public partial class OverlayWindow : Window
     }
 
     private bool _userExplicitlySetMode;
+
+    /// <summary>
+    /// Fire-and-forget wrapper that catches and logs exceptions from PerformLookupAsync,
+    /// preventing unobserved task exceptions from crashing the app.
+    /// </summary>
+    private async void SafePerformLookup(string input)
+    {
+        try
+        {
+            await PerformLookupAsync(input);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[OverlayWindow] Lookup failed: {ex}");
+        }
+    }
 
     private async Task PerformLookupAsync(string input)
     {

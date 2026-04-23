@@ -53,6 +53,10 @@ public partial class App : Application
 
     protected override async void OnStartup(StartupEventArgs e)
     {
+        // Global exception handlers to prevent silent crashes
+        TaskScheduler.UnobservedTaskException += OnUnobservedTaskException;
+        AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
+
         // Single-instance enforcement
         _singleInstanceMutex = new Mutex(true, "VerbaCore_B3F8A2E1-7C4D-4E5A-9B2F-1A3C5D7E9F0B", out var isNew);
         if (!isNew)
@@ -264,9 +268,22 @@ public partial class App : Application
 
     private void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
     {
-        MessageBox.Show($"An error occurred:\n{e.Exception.Message}", "VerbaCore Error",
-            MessageBoxButton.OK, MessageBoxImage.Error);
+        // Prevent the app from crashing on UI thread exceptions
+        System.Diagnostics.Debug.WriteLine($"[VerbaCore] Unhandled UI exception: {e.Exception}");
         e.Handled = true;
+    }
+
+    private static void OnUnobservedTaskException(object? sender, System.Threading.Tasks.UnobservedTaskExceptionEventArgs e)
+    {
+        // Prevent the app from crashing on unobserved async exceptions
+        System.Diagnostics.Debug.WriteLine($"[VerbaCore] Unobserved task exception: {e.Exception}");
+        e.SetObserved();
+    }
+
+    private static void OnUnhandledException(object sender, UnhandledExceptionEventArgs e)
+    {
+        // Last resort — log but can't prevent termination if e.IsTerminating
+        System.Diagnostics.Debug.WriteLine($"[VerbaCore] Unhandled domain exception: {e.ExceptionObject}");
     }
 
     protected override void OnExit(ExitEventArgs e)
