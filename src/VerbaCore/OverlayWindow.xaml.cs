@@ -85,10 +85,15 @@ public partial class OverlayWindow : Window
 
         InitializeComponent();
 
-        // Cursor blink timer
-        _cursorBlinkTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(530) };
+        // Cursor blink timer — smooth sine-wave pulse instead of hard toggle
+        _cursorBlinkTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(40) };
+        var _cursorPhase = 0.0;
         _cursorBlinkTimer.Tick += (_, _) =>
-            BlinkingCursor.Opacity = BlinkingCursor.Opacity > 0.1 ? 0 : 0.8;
+        {
+            _cursorPhase += 0.08;
+            if (_cursorPhase > 2 * Math.PI) _cursorPhase -= 2 * Math.PI;
+            BlinkingCursor.Opacity = 0.3 + 0.5 * (0.5 + 0.5 * Math.Sin(_cursorPhase));
+        };
 
         // Auto-hide timer (hide result after delay)
         _autoHideTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(120) };
@@ -107,9 +112,10 @@ public partial class OverlayWindow : Window
 
         // Close overlay when it loses focus (user clicked outside)
         // Don't auto-close during an active API lookup — user can still Esc/CapsLock to close
+        // Don't auto-close while activating (ForceActivate may cause transient focus loss)
         Deactivated += (_, _) =>
         {
-            if (_isShown && !_isLookupInProgress)
+            if (_isShown && !_isLookupInProgress && !_isActivating)
                 HideOverlay();
         };
 
@@ -123,6 +129,7 @@ public partial class OverlayWindow : Window
                 _currentMode = _modes[_modeIndex];
                 _userExplicitlySetMode = true;
                 UpdateModeLabel();
+                AnimateModeLabelSwitch();
                 e.Handled = true;
                 return;
             }
@@ -202,6 +209,7 @@ public partial class OverlayWindow : Window
             _currentMode = _modes[_modeIndex];
             _userExplicitlySetMode = true;
             UpdateModeLabel();
+            AnimateModeLabelSwitch();
         }
     }
 
@@ -383,6 +391,7 @@ public partial class OverlayWindow : Window
                 _currentMode = _modes[_modeIndex];
                 _userExplicitlySetMode = true;
                 UpdateModeLabel();
+                AnimateModeLabelSwitch();
                 // Remove tab from buffer, preserving any text typed before it
                 var cleaned = buffer.TrimEnd('\t');
                 _capsLockService.SetBuffer(cleaned);
@@ -548,7 +557,7 @@ public partial class OverlayWindow : Window
                 {
                     firstChunk = false;
                     StopLoadingSpinner();
-                    ResultViewer.Visibility = Visibility.Visible;
+                    ShowResultViewer();
                 }
                 sb.Append(chunk);
 
@@ -583,7 +592,7 @@ public partial class OverlayWindow : Window
         catch (TaskCanceledException ex) when (ex.InnerException is TimeoutException)
         {
             StopLoadingSpinner();
-            ResultViewer.Visibility = Visibility.Visible;
+            ShowResultViewer();
             RenderMarkdown("## \u23f0 시간 초과\n\n응답 시간이 초과되었습니다. 다시 시도해주세요.");
             StatusLabel.Text = "시간 초과";
             _autoHideTimer.Start();
@@ -596,7 +605,7 @@ public partial class OverlayWindow : Window
         catch (Exception ex)
         {
             StopLoadingSpinner();
-            ResultViewer.Visibility = Visibility.Visible;
+            ShowResultViewer();
             RenderMarkdown($"## \u274c 오류\n\n{ex.Message}\n\nAPI Key와 설정을 확인해주세요.");
             StatusLabel.Text = "오류 발생";
             _autoHideTimer.Start();
@@ -612,6 +621,38 @@ public partial class OverlayWindow : Window
         LoadingPanel.Visibility = Visibility.Collapsed;
         if (LoadingPanel.FindResource("SpinnerStoryboard") is Storyboard sb)
             sb.Stop(LoadingPanel);
+    }
+
+    /// <summary>
+    /// Shows the ResultViewer with a quick fade-in animation.
+    /// </summary>
+    private void ShowResultViewer()
+    {
+        if (ResultViewer.Visibility == Visibility.Visible) return;
+        ResultViewer.Visibility = Visibility.Visible;
+        ResultViewer.BeginAnimation(OpacityProperty, null);
+        ResultViewer.Opacity = 0;
+        var fade = new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(200))
+        {
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut },
+            FillBehavior = FillBehavior.Stop
+        };
+        fade.Completed += (_, _) => ResultViewer.Opacity = 1;
+        ResultViewer.BeginAnimation(OpacityProperty, fade);
+    }
+
+    /// <summary>
+    /// Animates the mode label with a brief flash when mode changes.
+    /// </summary>
+    private void AnimateModeLabelSwitch()
+    {
+        var flash = new DoubleAnimation(0.3, 1, TimeSpan.FromMilliseconds(250))
+        {
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut },
+            FillBehavior = FillBehavior.Stop
+        };
+        flash.Completed += (_, _) => ModeLabel.Opacity = 1;
+        ModeLabel.BeginAnimation(OpacityProperty, flash);
     }
 
     private void ResetAutoHideTimer()
@@ -716,9 +757,12 @@ public partial class OverlayWindow : Window
         _isShown = true;
         _isActivating = true;
 
-        // Use Window.Opacity for fade — immune to WPF-UI theme changes
+        // Reset animation state
         BeginAnimation(OpacityProperty, null);
         Opacity = 0;
+        ContentScale.ScaleX = 0.92;
+        ContentScale.ScaleY = 0.92;
+        ContentTranslate.Y = 18;
 
         // Always Hide+Show so the window moves to the current virtual desktop
         if (IsVisible)
@@ -729,10 +773,26 @@ public partial class OverlayWindow : Window
 
         ForceActivate();
 
-        var fadeIn = new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(120));
-        fadeIn.FillBehavior = FillBehavior.Stop;
+        // Entrance animation: fade + scale up + slide up
+        var duration = TimeSpan.FromMilliseconds(220);
+        var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
+
+        var fadeIn = new DoubleAnimation(0, 1, duration) { EasingFunction = ease, FillBehavior = FillBehavior.Stop };
         fadeIn.Completed += (_, _) => Opacity = 1;
+
+        var scaleXIn = new DoubleAnimation(0.92, 1, duration) { EasingFunction = ease, FillBehavior = FillBehavior.Stop };
+        scaleXIn.Completed += (_, _) => ContentScale.ScaleX = 1;
+
+        var scaleYIn = new DoubleAnimation(0.92, 1, duration) { EasingFunction = ease, FillBehavior = FillBehavior.Stop };
+        scaleYIn.Completed += (_, _) => ContentScale.ScaleY = 1;
+
+        var slideIn = new DoubleAnimation(18, 0, duration) { EasingFunction = ease, FillBehavior = FillBehavior.Stop };
+        slideIn.Completed += (_, _) => ContentTranslate.Y = 0;
+
         BeginAnimation(OpacityProperty, fadeIn);
+        ContentScale.BeginAnimation(ScaleTransform.ScaleXProperty, scaleXIn);
+        ContentScale.BeginAnimation(ScaleTransform.ScaleYProperty, scaleYIn);
+        ContentTranslate.BeginAnimation(TranslateTransform.YProperty, slideIn);
     }
 
     public void HideOverlay()
@@ -753,12 +813,19 @@ public partial class OverlayWindow : Window
         InputTextBox.Visibility = Visibility.Collapsed;
         InputDisplay.Visibility = Visibility.Visible;
 
-        var fadeOut = new DoubleAnimation(1, 0, TimeSpan.FromMilliseconds(150));
-        fadeOut.FillBehavior = FillBehavior.Stop;
+        // Exit animation: fade + scale down + slide down
+        var duration = TimeSpan.FromMilliseconds(180);
+        var ease = new CubicEase { EasingMode = EasingMode.EaseIn };
+
+        var fadeOut = new DoubleAnimation(1, 0, duration) { EasingFunction = ease, FillBehavior = FillBehavior.Stop };
         fadeOut.Completed += (_, _) =>
         {
             BeginAnimation(OpacityProperty, null);
             Opacity = 0;
+            // Reset transforms
+            ContentScale.ScaleX = 1;
+            ContentScale.ScaleY = 1;
+            ContentTranslate.Y = 0;
 
             // Only move off-screen if overlay hasn't been re-shown during fade
             if (!_isShown)
@@ -767,7 +834,20 @@ public partial class OverlayWindow : Window
                 Top = -9999;
             }
         };
+
+        var scaleXOut = new DoubleAnimation(1, 0.95, duration) { EasingFunction = ease, FillBehavior = FillBehavior.Stop };
+        scaleXOut.Completed += (_, _) => ContentScale.ScaleX = 0.95;
+
+        var scaleYOut = new DoubleAnimation(1, 0.95, duration) { EasingFunction = ease, FillBehavior = FillBehavior.Stop };
+        scaleYOut.Completed += (_, _) => ContentScale.ScaleY = 0.95;
+
+        var slideOut = new DoubleAnimation(0, 10, duration) { EasingFunction = ease, FillBehavior = FillBehavior.Stop };
+        slideOut.Completed += (_, _) => ContentTranslate.Y = 10;
+
         BeginAnimation(OpacityProperty, fadeOut);
+        ContentScale.BeginAnimation(ScaleTransform.ScaleXProperty, scaleXOut);
+        ContentScale.BeginAnimation(ScaleTransform.ScaleYProperty, scaleYOut);
+        ContentTranslate.BeginAnimation(TranslateTransform.YProperty, slideOut);
     }
 
     /// <summary>

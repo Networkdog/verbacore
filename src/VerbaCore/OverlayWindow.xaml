@@ -14,8 +14,16 @@
 
     <Grid x:Name="RootGrid">
         <!-- Semi-transparent backdrop with subtle gradient -->
-        <Border CornerRadius="16"
-                Margin="20">
+        <Border x:Name="ContentBorder"
+                CornerRadius="16"
+                Margin="20"
+                RenderTransformOrigin="0.5,0.5">
+            <Border.RenderTransform>
+                <TransformGroup>
+                    <ScaleTransform x:Name="ContentScale" ScaleX="1" ScaleY="1" />
+                    <TranslateTransform x:Name="ContentTranslate" Y="0" />
+                </TransformGroup>
+            </Border.RenderTransform>
             <Border.Background>
                 <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
                     <GradientStop Color="#CC1A1A2E" Offset="0" />
@@ -132,6 +140,7 @@
                               VerticalScrollBarVisibility="Auto"
                               HorizontalScrollBarVisibility="Disabled"
                               Visibility="Collapsed"
+                              Opacity="0"
                               Margin="0,8,0,0"
                               Background="Transparent"
                               Foreground="#E0FFFFFF"
@@ -151,12 +160,23 @@
                             <DoubleAnimation Storyboard.TargetName="SpinnerRotation"
                                              Storyboard.TargetProperty="Angle"
                                              From="0" To="360"
-                                             Duration="0:0:1"
+                                             Duration="0:0:0.9"
+                                             RepeatBehavior="Forever">
+                                <DoubleAnimation.EasingFunction>
+                                    <CubicEase EasingMode="EaseInOut" />
+                                </DoubleAnimation.EasingFunction>
+                            </DoubleAnimation>
+                            <DoubleAnimation Storyboard.TargetName="SpinnerEllipse"
+                                             Storyboard.TargetProperty="Opacity"
+                                             From="0.5" To="1.0"
+                                             Duration="0:0:0.8"
+                                             AutoReverse="True"
                                              RepeatBehavior="Forever" />
                         </Storyboard>
                     </StackPanel.Resources>
                     <!-- Rotating arc spinner -->
-                    <Ellipse Width="36" Height="36"
+                    <Ellipse x:Name="SpinnerEllipse"
+                             Width="36" Height="36"
                              StrokeThickness="2.5"
                              Stroke="#90FFFFFF"
                              StrokeDashArray="3 4"
