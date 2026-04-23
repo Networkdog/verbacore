@@ -43,11 +43,20 @@ public sealed class OpenAiService : IOpenAiService
         var s = _settings.Current;
         return s.Provider switch
         {
-            ApiProvider.AzureOpenAI => $"{s.AzureEndpoint.TrimEnd('/')}/openai/deployments/{s.Model}/chat/completions?api-version={s.AzureApiVersion}",
+            ApiProvider.AzureOpenAI => BuildAzureUrl(s),
             ApiProvider.Custom => BuildCustomUrl(s.CustomEndpoint),
-            ApiProvider.Google => $"https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+            ApiProvider.Google => "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
             _ => ProviderUrls.GetValueOrDefault(s.Provider, ProviderUrls[ApiProvider.OpenAI])
         };
+    }
+
+    private static string BuildAzureUrl(AppSettings s)
+    {
+        // Use AzureDeploymentName if set, otherwise fall back to Model
+        var deployment = !string.IsNullOrWhiteSpace(s.AzureDeploymentName)
+            ? s.AzureDeploymentName
+            : s.Model;
+        return $"{s.AzureEndpoint.TrimEnd('/')}/openai/deployments/{deployment}/chat/completions?api-version={s.AzureApiVersion}";
     }
 
     private static string BuildCustomUrl(string endpoint)
@@ -138,60 +147,46 @@ public sealed class OpenAiService : IOpenAiService
         await EnsureSuccessOrThrowAsync(response, ct);
 
         await using var responseStream = await response.Content.ReadAsStreamAsync(ct);
-        using var reader = new System.IO.StreamReader(responseStream, Encoding.UTF8, false, bufferSize: 64);
-
-        var lineBuffer = new StringBuilder();
-        var charBuffer = new char[1];
+        using var reader = new System.IO.StreamReader(responseStream, Encoding.UTF8, detectEncodingFromByteOrderMarks: false, bufferSize: 4096);
 
         while (!ct.IsCancellationRequested)
         {
-            var bytesRead = await reader.ReadAsync(charBuffer, 0, 1);
-            if (bytesRead == 0) yield break; // End of stream
+            var line = await reader.ReadLineAsync(ct);
+            if (line is null) yield break; // End of stream
 
-            var ch = charBuffer[0];
-            if (ch == '\n')
+            if (string.IsNullOrWhiteSpace(line)) continue;
+            if (!line.StartsWith("data: ")) continue;
+
+            var data = line["data: ".Length..];
+            if (data == "[DONE]") yield break;
+
+            // Anthropic SSE uses content_block_delta; OpenAI-compatible uses choices[].delta
+            string? content = null;
+            try
             {
-                var line = lineBuffer.ToString();
-                lineBuffer.Clear();
+                using var doc = JsonDocument.Parse(data);
+                var root = doc.RootElement;
 
-                if (string.IsNullOrWhiteSpace(line)) continue;
-                if (!line.StartsWith("data: ")) continue;
-
-                var data = line["data: ".Length..];
-                if (data == "[DONE]") yield break;
-
-                // Anthropic SSE uses content_block_delta; OpenAI-compatible uses choices[].delta
-                string? content = null;
-                try
+                if (root.TryGetProperty("choices", out var choices)
+                    && choices.GetArrayLength() > 0
+                    && choices[0].TryGetProperty("delta", out var delta)
+                    && delta.TryGetProperty("content", out var contentProp))
                 {
-                    using var doc = JsonDocument.Parse(data);
-                    var root = doc.RootElement;
-
-                    if (root.TryGetProperty("choices", out var choices)
-                        && choices.GetArrayLength() > 0
-                        && choices[0].TryGetProperty("delta", out var delta)
-                        && delta.TryGetProperty("content", out var contentProp))
-                    {
-                        content = contentProp.GetString();
-                    }
-                    else if (root.TryGetProperty("type", out var typeProp)
-                             && typeProp.GetString() == "content_block_delta"
-                             && root.TryGetProperty("delta", out var anthropicDelta)
-                             && anthropicDelta.TryGetProperty("text", out var textProp))
-                    {
-                        content = textProp.GetString();
-                    }
+                    content = contentProp.GetString();
                 }
-                catch (JsonException) { continue; }
-
-                if (!string.IsNullOrEmpty(content))
+                else if (root.TryGetProperty("type", out var typeProp)
+                         && typeProp.GetString() == "content_block_delta"
+                         && root.TryGetProperty("delta", out var anthropicDelta)
+                         && anthropicDelta.TryGetProperty("text", out var textProp))
                 {
-                    yield return content;
+                    content = textProp.GetString();
                 }
             }
-            else if (ch != '\r')
+            catch (JsonException) { continue; }
+
+            if (!string.IsNullOrEmpty(content))
             {
-                lineBuffer.Append(ch);
+                yield return content;
             }
         }
     }
@@ -302,20 +297,5 @@ public sealed class OpenAiService : IOpenAiService
     private sealed class Choice
     {
         [JsonPropertyName("message")] public ChatMessage? Message { get; set; }
-    }
-
-    private sealed class ChatCompletionChunk
-    {
-        [JsonPropertyName("choices")] public List<StreamChoice>? Choices { get; set; }
-    }
-
-    private sealed class StreamChoice
-    {
-        [JsonPropertyName("delta")] public DeltaContent? Delta { get; set; }
-    }
-
-    private sealed class DeltaContent
-    {
-        [JsonPropertyName("content")] public string? Content { get; set; }
     }
 }

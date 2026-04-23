@@ -31,7 +31,6 @@ public partial class App : Application
         services.AddSingleton<HistoryService>();
         services.AddSingleton<PromptBuilder>();
         services.AddSingleton<CapsLockService>();
-        services.AddSingleton<SpeechInputService>();
         services.AddSingleton<CursorTextService>();
         services.AddSingleton<HotkeyService>();
         services.AddHttpClient<IOpenAiService, OpenAiService>(client =>
@@ -42,7 +41,6 @@ public partial class App : Application
         });
 
         // ViewModels
-        services.AddSingleton<MainViewModel>();
         services.AddSingleton<SettingsViewModel>();
         services.AddTransient<HistoryViewModel>(sp =>
         {
@@ -147,7 +145,12 @@ public partial class App : Application
             if (!System.IO.File.Exists(path)) continue;
             using var bmp = new Bitmap(path);
             var hIcon = bmp.GetHicon();
-            return Icon.FromHandle(hIcon);
+            var icon = Icon.FromHandle(hIcon);
+            // Clone to take ownership; FromHandle doesn't own the HICON
+            var cloned = (Icon)icon.Clone();
+            icon.Dispose();
+            Helpers.NativeMethods.DestroyIcon(hIcon);
+            return cloned;
         }
 
         return SystemIcons.Application;

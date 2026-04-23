@@ -54,7 +54,14 @@ public partial class OverlayWindow : Window
     private static readonly SolidColorBrush ItalicBrush = CreateFrozenBrush(0xD0, 0xCC, 0xDD, 0xFF);
     private static readonly SolidColorBrush CodeFgBrush = CreateFrozenBrush(0xFF, 0xA0, 0xE0, 0xFF);
     private static readonly SolidColorBrush CodeBgBrush = CreateFrozenBrush(0x30, 0xFF, 0xFF, 0xFF);
+    private static readonly SolidColorBrush CompactInputBrush = CreateFrozenBrush(0x90, 0xFF, 0xFF, 0xFF);
+    private static readonly SolidColorBrush HeadingBrush = CreateFrozenBrush(0xFF, 0x60, 0xCD, 0xFF);
+    private static readonly SolidColorBrush HeadingSubBrush = CreateFrozenBrush(0xFF, 0x90, 0xD0, 0xF0);
+    private static readonly SolidColorBrush BlockquoteBgBrush = CreateFrozenBrush(0x18, 0x80, 0xC0, 0xFF);
+    private static readonly SolidColorBrush BlockquoteBorderBrush = CreateFrozenBrush(0x60, 0x60, 0xCD, 0xFF);
+    private static readonly SolidColorBrush HrBrush = CreateFrozenBrush(0x30, 0xFF, 0xFF, 0xFF);
     private static readonly FontFamily AppFontFamily = (FontFamily)Application.Current.FindResource("AppContentFont");
+    private static readonly FontFamily CodeFontFamily = (FontFamily)Application.Current.FindResource("AppCodeFont");
 
     private static SolidColorBrush CreateFrozenBrush(byte a, byte r, byte g, byte b)
     {
@@ -222,7 +229,7 @@ public partial class OverlayWindow : Window
             // Reset UI for new input
             InputDisplay.Text = _grabbedSelectedText ?? "";
             InputDisplay.FontWeight = FontWeights.Light;
-            InputDisplay.Foreground = new SolidColorBrush(Colors.White);
+            InputDisplay.Foreground = WhiteBrush;
             InputDisplay.TextWrapping = TextWrapping.Wrap;
             InputDisplay.TextTrimming = TextTrimming.CharacterEllipsis;
             InputDisplay.MaxHeight = 220;
@@ -463,7 +470,7 @@ public partial class OverlayWindow : Window
         InputDisplay.Text = displayText;
         InputDisplay.FontSize = 18 * sizeScale;
         InputDisplay.FontWeight = FontWeights.Normal;
-        InputDisplay.Foreground = new SolidColorBrush(Color.FromArgb(0x90, 0xFF, 0xFF, 0xFF));
+        InputDisplay.Foreground = CompactInputBrush;
         InputDisplay.TextWrapping = TextWrapping.NoWrap;
         InputDisplay.TextTrimming = TextTrimming.CharacterEllipsis;
         InputDisplay.MaxHeight = 30 * sizeScale;
@@ -840,24 +847,28 @@ public partial class OverlayWindow : Window
 
     private static void ApplyDarkThemeToBlock(System.Windows.Documents.Block block, double baseFontSize)
     {
-        block.Foreground = new SolidColorBrush(Color.FromArgb(0xE0, 0xFF, 0xFF, 0xFF));
+        block.Foreground = TextBrush;
 
         if (block is Paragraph p)
         {
-            // Detect headings: Markdig.Wpf sets FontSize relative to document base
-            // If the paragraph has a FontSize explicitly set and it differs from base, it's a heading
             var pFontSize = p.FontSize;
             bool isHeading = !double.IsNaN(pFontSize) && pFontSize != baseFontSize;
 
             if (isHeading)
             {
-                // Scale headings relative to base font size
-                // Markdig.Wpf typically uses ratios like 2.0, 1.5, 1.17, 1.0 for h1-h4
-                double ratio = pFontSize / 12.0; // Markdig default base is ~12
+                double ratio = pFontSize / 12.0;
                 p.FontSize = baseFontSize * Math.Max(ratio, 1.2);
-                p.Foreground = new SolidColorBrush(Colors.White);
+                p.Foreground = ratio > 1.3 ? HeadingBrush : HeadingSubBrush;
                 p.FontWeight = System.Windows.FontWeights.Bold;
-                p.Margin = new Thickness(0, 8, 0, 4);
+                p.Margin = new Thickness(0, 10, 0, 4);
+            }
+
+            // Detect horizontal rule: empty paragraph
+            if (p.Inlines.Count == 0)
+            {
+                p.BorderBrush = HrBrush;
+                p.BorderThickness = new Thickness(0, 0, 0, 1);
+                p.Margin = new Thickness(0, 12, 0, 12);
             }
 
             foreach (var inline in p.Inlines)
@@ -867,6 +878,7 @@ public partial class OverlayWindow : Window
         }
         else if (block is System.Windows.Documents.List list)
         {
+            list.Margin = new Thickness(16, 4, 0, 4);
             foreach (var item in list.ListItems)
             {
                 foreach (var itemBlock in item.Blocks)
@@ -877,6 +889,13 @@ public partial class OverlayWindow : Window
         }
         else if (block is System.Windows.Documents.Section section)
         {
+            // Blockquotes — left accent border + subtle background
+            section.Background = BlockquoteBgBrush;
+            section.BorderBrush = BlockquoteBorderBrush;
+            section.BorderThickness = new Thickness(3, 0, 0, 0);
+            section.Padding = new Thickness(14, 10, 14, 10);
+            section.Margin = new Thickness(0, 8, 0, 8);
+
             foreach (var sBlock in section.Blocks)
             {
                 ApplyDarkThemeToBlock(sBlock, baseFontSize);
@@ -908,6 +927,7 @@ public partial class OverlayWindow : Window
         {
             run.Foreground = CodeFgBrush;
             run.Background = CodeBgBrush;
+            run.FontFamily = CodeFontFamily;
         }
         else if (inline is System.Windows.Documents.Span span)
         {

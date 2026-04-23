@@ -13,13 +13,24 @@
         Focusable="True">
 
     <Grid x:Name="RootGrid">
-        <!-- Semi-transparent backdrop -->
-        <Border Background="#CC1A1A1A"
-                CornerRadius="16"
+        <!-- Semi-transparent backdrop with subtle gradient -->
+        <Border CornerRadius="16"
                 Margin="20">
+            <Border.Background>
+                <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                    <GradientStop Color="#CC1A1A2E" Offset="0" />
+                    <GradientStop Color="#CC141420" Offset="1" />
+                </LinearGradientBrush>
+            </Border.Background>
             <Border.Effect>
-                <DropShadowEffect BlurRadius="30" ShadowDepth="0" Opacity="0.5" Color="Black" />
+                <DropShadowEffect BlurRadius="40" ShadowDepth="0" Opacity="0.6" Color="#000020" />
             </Border.Effect>
+
+            <!-- Inner border for subtle edge highlight -->
+            <Border CornerRadius="15"
+                    BorderBrush="#18FFFFFF"
+                    BorderThickness="1"
+                    Padding="0">
 
             <Grid Margin="32,24">
                 <Grid.RowDefinitions>
@@ -30,28 +41,30 @@
                 </Grid.RowDefinitions>
 
                 <!-- Mode indicator -->
-                <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,12">
-                    <TextBlock x:Name="ModeLabel"
-                               Text="📖 사전"
-                               FontSize="15"
-                               FontFamily="{StaticResource AppUIFont}"
-                               Foreground="#80FFFFFF"
-                               VerticalAlignment="Center" />
+                <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,16">
+                    <Border Background="#20FFFFFF" CornerRadius="8" Padding="10,4">
+                        <TextBlock x:Name="ModeLabel"
+                                   Text="📖 사전"
+                                   FontSize="14"
+                                   FontFamily="{StaticResource AppUIFont}"
+                                   Foreground="#B0FFFFFF"
+                                   VerticalAlignment="Center" />
+                    </Border>
                     <TextBlock Text="  ·  "
-                               FontSize="15"
+                               FontSize="14"
                                FontFamily="{StaticResource AppUIFont}"
-                               Foreground="#40FFFFFF"
+                               Foreground="#30FFFFFF"
                                VerticalAlignment="Center" />
                     <TextBlock x:Name="LangLabel"
                                Text="EN → KO"
-                               FontSize="15"
+                               FontSize="14"
                                FontFamily="{StaticResource AppUIFont}"
-                               Foreground="#80FFFFFF"
+                               Foreground="#70FFFFFF"
                                VerticalAlignment="Center" />
                     <TextBlock Text="  ·  Tab: 모드 전환"
-                               FontSize="15"
+                               FontSize="13"
                                FontFamily="{StaticResource AppUIFont}"
-                               Foreground="#40FFFFFF"
+                               Foreground="#35FFFFFF"
                                VerticalAlignment="Center"
                                x:Name="HintLabel" />
                 </StackPanel>
@@ -143,10 +156,10 @@
                         </Storyboard>
                     </StackPanel.Resources>
                     <!-- Rotating arc spinner -->
-                    <Ellipse Width="44" Height="44"
-                             StrokeThickness="3"
-                             Stroke="#B0FFFFFF"
-                             StrokeDashArray="2.5 5"
+                    <Ellipse Width="36" Height="36"
+                             StrokeThickness="2.5"
+                             Stroke="#90FFFFFF"
+                             StrokeDashArray="3 4"
                              StrokeDashCap="Round"
                              HorizontalAlignment="Center"
                              RenderTransformOrigin="0.5,0.5">
@@ -154,18 +167,25 @@
                             <RotateTransform x:Name="SpinnerRotation" Angle="0" />
                         </Ellipse.RenderTransform>
                     </Ellipse>
+                    <TextBlock Text="조회 중..."
+                               FontSize="13"
+                               FontFamily="{StaticResource AppUIFont}"
+                               Foreground="#60FFFFFF"
+                               HorizontalAlignment="Center"
+                               Margin="0,10,0,0" />
                 </StackPanel>
 
                 <!-- Status -->
                 <TextBlock Grid.Row="3"
                            x:Name="StatusLabel"
                            Text="CapsLock을 누른 채로 단어를 입력하세요"
-                           FontSize="15"
+                           FontSize="13"
                            FontFamily="{StaticResource AppUIFont}"
-                           Foreground="#50FFFFFF"
+                           Foreground="#40FFFFFF"
                            HorizontalAlignment="Center"
-                           Margin="0,8,0,0" />
+                           Margin="0,10,0,0" />
             </Grid>
+            </Border>
         </Border>
     </Grid>
 </Window>

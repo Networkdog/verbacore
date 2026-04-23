@@ -82,7 +82,8 @@ public sealed class SettingsService
             Theme = _current.Theme,
             WindowWidth = _current.WindowWidth,
             WindowHeight = _current.WindowHeight,
-            PopupPosition = _current.PopupPosition
+            PopupPosition = _current.PopupPosition,
+            OverlaySize = _current.OverlaySize
         };
 
         var json = JsonSerializer.Serialize(toSave, JsonOptions);

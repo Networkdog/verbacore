@@ -294,15 +294,6 @@ public sealed class CapsLockService : IDisposable
         };
     }
 
-    /// <summary>
-    /// Ensures CapsLock toggle state is OFF.
-    /// Safe to call anytime — injected key events are filtered in the hook.
-    /// </summary>
-    private static void EnsureCapsLockOff()
-    {
-        NativeMethods.ToggleCapsLockOff();
-    }
-
     public void Dispose()
     {
         if (_hookId != IntPtr.Zero)

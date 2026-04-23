@@ -30,7 +30,6 @@
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.5" />
     <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.5" />
     <PackageReference Include="NHotkey.Wpf" Version="4.0.0" />
-    <PackageReference Include="System.Speech" Version="10.0.5" />
     <PackageReference Include="WPF-UI" Version="3.0.5" />
   </ItemGroup>
 
