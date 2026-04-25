@@ -26,6 +26,8 @@ UninstallDisplayIcon={app}\{#MyAppExeName}
 WizardStyle=modern
 DisableProgramGroupPage=yes
 ArchitecturesInstallIn64BitMode=x64compatible
+CloseApplications=force
+CloseApplicationsFilter={#MyAppExeName}
 
 [Languages]
 Name: "korean"; MessagesFile: "compiler:Languages\Korean.isl"
@@ -59,4 +61,13 @@ Type: filesandordirs; Name: "{localappdata}\VerbaCore"
 function IsSilentInstall: Boolean;
 begin
   Result := WizardSilent;
+end;
+
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+var
+  ResultCode: Integer;
+begin
+  Result := '';
+  // Force-kill VerbaCore.exe if still running (fallback for Restart Manager)
+  Exec('taskkill.exe', '/F /IM {#MyAppExeName}', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
 end;
