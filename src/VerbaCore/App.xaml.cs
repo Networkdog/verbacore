@@ -136,12 +136,18 @@ public partial class App : Application
 
     private static Icon LoadTrayIcon()
     {
-        var exeDir = AppContext.BaseDirectory;
+        // For single-file publish, AppContext.BaseDirectory points to the temp extraction dir,
+        // not the actual install directory. Use the exe's real location instead.
+        var exePath = Environment.ProcessPath;
+        var exeDir = !string.IsNullOrEmpty(exePath)
+            ? System.IO.Path.GetDirectoryName(exePath)!
+            : AppContext.BaseDirectory;
 
         // 1. Try .ico files first (native icon format, best quality)
         var icoCandidates = new[]
         {
             System.IO.Path.Combine(exeDir, "res", "icons", "verbacore.ico"),
+            System.IO.Path.Combine(AppContext.BaseDirectory, "res", "icons", "verbacore.ico"),
             System.IO.Path.Combine(exeDir, "..", "..", "..", "..", "..", "res", "icons", "verbacore.ico"),
         };
 
@@ -156,6 +162,7 @@ public partial class App : Application
         var pngCandidates = new[]
         {
             System.IO.Path.Combine(exeDir, "res", "icons", "verbacore.png"),
+            System.IO.Path.Combine(AppContext.BaseDirectory, "res", "icons", "verbacore.png"),
             System.IO.Path.Combine(exeDir, "..", "..", "..", "..", "..", "res", "icons", "verbacore.png"),
         };
 

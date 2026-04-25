@@ -30,14 +30,15 @@ Most dictionary & translation apps make you **leave** what you're doing. VerbaCo
 
 ## Features
 
-### Two AI-Powered Modes
+### Three AI-Powered Modes
 
 | Mode | What it does |
 |------|-------------|
 | 📖 **Dictionary** | Deep word lookup with etymology storytelling, IPA pronunciation, Korean phonetic guide, synonyms/antonyms, and usage examples |
 | 🔄 **Translate** | Context-aware translation with nuance notes, formality levels, and alternatives. Input text compacts to a single-line summary so the translation result takes center stage |
+| 💡 **Assist** | Explains non-language content — code snippets, error messages, URLs, formulas, config files — with practical, actionable insight |
 
-**Smart auto-selection**: The mode is chosen automatically based on input length — short input (≤3 words) defaults to Dictionary, longer input defaults to Translate. Press **Tab** to override manually.
+**Smart auto-selection**: The mode is chosen automatically — short input (≤3 words) → Dictionary, longer input → Translate, code/URLs/formulas → Assist. Press **Tab** to override manually.
 
 ### 6 AI Providers
 
@@ -56,10 +57,9 @@ All providers use SSE streaming for real-time response rendering.
 
 | Method | How |
 |--------|-----|
-| ⌨️ **CapsLock Hold** (EnsoMode) | Hold CapsLock → type → release to look up. Large Enso-style text overlay |
+| ⌨️ **CapsLock Hold** (EnsoMode) | Hold CapsLock → type → release to look up. Large text overlay |
 | ⌨️ **CapsLock Tap** (PersistentMode) | Quick-tap CapsLock (<0.5s) to open a persistent input box with full IME support |
 | 🔥 **Global Hotkey** | `Ctrl+Alt+V` (customizable) to activate PersistentMode from any app |
-| 🎤 **Voice Input** | Click the mic button — speaks and auto-looks up (System.Speech) |
 | 🖱️ **Cursor Text Grab** | Automatically grabs selected text under your cursor via COM UIA3 (works with Chromium/Electron) |
 
 ### Keyboard Shortcuts
@@ -68,7 +68,7 @@ All providers use SSE streaming for real-time response rendering.
 |----------|--------|
 | `CapsLock` (hold) | Open overlay + EnsoMode, lookup on release |
 | `CapsLock` (tap <0.5s) | Toggle PersistentMode |
-| `Tab` | Cycle Dictionary ↔ Translate |
+| `Tab` | Cycle Dictionary ↔ Translate ↔ Assist |
 | `Backspace` | Delete last character |
 | `Escape` | Close overlay / cancel lookup |
 | `Enter` | Submit input (PersistentMode) |
@@ -160,7 +160,6 @@ Switch the provider to **Custom** and enter any OpenAI-compatible endpoint. Work
 | DI | Microsoft.Extensions.DependencyInjection |
 | Markdown | [Markdig.Wpf](https://github.com/Kryptos-FR/markdig.wpf) |
 | Hotkeys | [NHotkey.Wpf](https://github.com/thomaslevesque/NHotkey) |
-| Speech | System.Speech.Recognition |
 | Text Extraction | COM UIA3 (UI Automation, Chromium/Electron compatible) |
 | DPI | PerMonitorV2 via `ApplicationHighDpiMode` |
 | Installer | [Inno Setup](https://jrsoftware.org/isinfo.php) |
@@ -192,21 +191,21 @@ src/VerbaCore/
 ├── app.manifest               # Application manifest (PerMonitorV2 DPI)
 ├── Services/
 │   ├── CapsLockService.cs     # Low-level keyboard hook (EnsoMode + PersistentMode detection)
-│   ├── OpenAiService.cs       # 6-provider SSE streaming client
+│   ├── OpenAiService.cs       # 6-provider SSE streaming + Utf8JsonReader parsing
 │   ├── PromptBuilder.cs       # Mode-specific prompt engineering + auto-mode selection
-│   ├── SettingsService.cs     # JSON persistence + DPAPI encryption
-│   ├── HistoryService.cs      # Lookup history (200 items max, JSON)
+│   ├── SettingsService.cs     # JSON persistence + DPAPI encryption (source-generated)
+│   ├── HistoryService.cs      # Lookup history (200 items max, debounced save, source-generated)
 │   ├── HotkeyService.cs       # NHotkey global hotkey registration
-│   ├── SpeechInputService.cs  # System.Speech voice input
 │   └── CursorTextService.cs   # COM UIA3 selected text extraction
 ├── Models/
 │   ├── AppSettings.cs         # Settings model + enums (ApiProvider, OverlayPosition, OverlaySize, ThemeMode)
-│   ├── LookupResult.cs        # Single lookup result
+│   ├── AppJsonContext.cs      # System.Text.Json source generation contexts
+│   ├── LookupResult.cs        # Single lookup result + LookupMode enum
 │   └── LookupHistory.cs       # History item model
 ├── ViewModels/                # MVVM ViewModels (CommunityToolkit.Mvvm)
-├── Views/                     # WPF UserControls (SettingsView, HistoryView, MainView)
+├── Views/                     # WPF UserControls (SettingsView, HistoryView)
 └── Helpers/
-    ├── NativeMethods.cs       # Win32 P/Invoke (keyboard hook, etc.)
+    ├── NativeMethods.cs       # Win32 P/Invoke + CachedModuleHandle
     ├── UIA3Interop.cs         # COM UIA3 interop definitions
     └── Converters.cs          # XAML value converters
 ```
