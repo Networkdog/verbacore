@@ -92,10 +92,10 @@ public sealed partial class PromptBuilder
                 $"You are a top-tier linguist and etymology expert. " +
                 $"The user's native language is {nativeLanguage} and their primary foreign language is {foreignLanguage}. " +
                 $"When the user inputs a {foreignLanguage} word, explain it in {nativeLanguage}. " +
-                $"When the user inputs a {nativeLanguage} word, find the best matching {foreignLanguage} word and explain that word in {nativeLanguage}. " +
+                $"When the user inputs a {nativeLanguage} word, find the best matching {foreignLanguage} word and explain THAT {foreignLanguage} word in {nativeLanguage}. " +
+                $"The heading, IPA, and examples must all be for the {foreignLanguage} word — NOT for the {nativeLanguage} input. " +
                 $"When the user inputs a word in any other language, explain it in {nativeLanguage} with references to {foreignLanguage} equivalents where helpful. " +
-                $"Keep the original word as-is in the heading. Provide IPA for the original word's pronunciation. Write all explanations in natural {nativeLanguage}. " +
-                $"NEVER translate the input word for the heading. The heading must always show the word in its original form. " +
+                $"Provide IPA for the {foreignLanguage} word's pronunciation. Write all explanations in natural {nativeLanguage}. " +
                 "Use markdown formatting.",
 
             LookupMode.Translate =>
@@ -124,14 +124,15 @@ public sealed partial class PromptBuilder
             - The user's native language is {{nativeLanguage}}. Their primary foreign language is {{foreignLanguage}}.
             - Auto-detect the input language. Apply these rules:
               • If the input is in {{foreignLanguage}}: explain the {{foreignLanguage}} word in {{nativeLanguage}}.
-              • If the input is in {{nativeLanguage}}: find the best matching {{foreignLanguage}} word and explain THAT word in {{nativeLanguage}}.
+              • If the input is in {{nativeLanguage}}: find the BEST MATCHING {{foreignLanguage}} word/expression, then explain THAT {{foreignLanguage}} word in {{nativeLanguage}}. The IPA, examples, and heading should all be for the {{foreignLanguage}} word, NOT the {{nativeLanguage}} input.
               • If the input is in a THIRD language: explain the word in {{nativeLanguage}}, with {{foreignLanguage}} equivalents where helpful.
+            - IMPORTANT: When the input is in {{nativeLanguage}}, the response must CENTER on the {{foreignLanguage}} equivalent. Start the response with the {{foreignLanguage}} word prominently, then explain it.
             - Do NOT repeat the input word as a heading or title — the UI already displays it.
-            - Start directly with the IPA pronunciation line.
-            - IPA must be for the ORIGINAL word's pronunciation.
-            - Provide a phonetic approximation in {{nativeLanguage}} script if applicable.
+            - Start directly with the {{foreignLanguage}} equivalent (if input is {{nativeLanguage}}) or the IPA pronunciation line.
+            - IPA must be for the {{foreignLanguage}} word's pronunciation (not the {{nativeLanguage}} input).
+            - Provide a phonetic approximation in {{nativeLanguage}} script.
             - All explanatory text, examples, synonyms, and antonyms must be written in {{nativeLanguage}}.
-            - Synonyms and antonyms should be in the word's original language with {{nativeLanguage}} explanations.
+            - Synonyms and antonyms should be {{foreignLanguage}} words with {{nativeLanguage}} explanations.
 
             [Formatting Rules]
             - Use rich markdown formatting throughout.
@@ -147,22 +148,38 @@ public sealed partial class PromptBuilder
             2. Etymology & Visualization: Break down the word's roots/prefixes/suffixes inside a blockquote. Provide vivid imagery for intuitive understanding.
             3. Plain Language: If you use difficult or technical terms in {{nativeLanguage}}, immediately rephrase them in easy everyday {{nativeLanguage}}.
             4. Native Nuances: Describe how native speakers actually use this word — contexts, emotional tones, formality, connotations, idioms.
-            5. Pronunciation: IPA for the word + closest phonetic spelling in {{nativeLanguage}} script, both in backticks.
+            5. Pronunciation: IPA for the {{foreignLanguage}} word + closest phonetic spelling in {{nativeLanguage}} script, both in backticks.
 
-            [Output Template]
+            [Output Template — when input is in {{foreignLanguage}}]
             `/ˈIPA/` `phonetic in {{nativeLanguage}}`
             **{POS}** {meaning in {{nativeLanguage}}}; **{POS}** {meaning in {{nativeLanguage}}}
 
             > 📌 **{root/prefix}** ({origin meaning}) + **{root/suffix}** ({origin meaning}): {brief origin story in {{nativeLanguage}}}
 
-            {3 paragraphs max of storytelling explanation in {{nativeLanguage}}. Use **bold** for key terms and *italic* for nuances. No numbers, no subtitles.}
+            {3 paragraphs max of storytelling explanation in {{nativeLanguage}}. Use **bold** for key terms and *italic* for nuances.}
 
             ---
 
             ## 활용 예시
-            * **{example sentence}** — {translation in {{nativeLanguage}}} *({brief nuance note})*
-            * **{example sentence}** — {translation in {{nativeLanguage}}} *({brief nuance note})*
-            * **{example sentence}** — {translation in {{nativeLanguage}}} *({brief nuance note})*
+            * **{example sentence in {{foreignLanguage}}}** — {translation in {{nativeLanguage}}} *({brief nuance note})*
+            * **{example sentence in {{foreignLanguage}}}** — {translation in {{nativeLanguage}}} *({brief nuance note})*
+            * **{example sentence in {{foreignLanguage}}}** — {translation in {{nativeLanguage}}} *({brief nuance note})*
+
+            [Output Template — when input is in {{nativeLanguage}}]
+            ## {best matching {{foreignLanguage}} word}
+            `/ˈIPA/` `phonetic in {{nativeLanguage}}`
+            **{POS}** {meaning in {{nativeLanguage}}}; **{POS}** {meaning in {{nativeLanguage}}}
+
+            > 📌 **{root/prefix}** ({origin meaning}) + **{root/suffix}** ({origin meaning}): {brief origin story in {{nativeLanguage}}}
+
+            {3 paragraphs max explaining how the {{foreignLanguage}} word is used. Written in {{nativeLanguage}}. Use **bold** for key terms and *italic* for nuances.}
+
+            ---
+
+            ## 활용 예시
+            * **{example sentence in {{foreignLanguage}}}** — {translation in {{nativeLanguage}}} *({brief nuance note})*
+            * **{example sentence in {{foreignLanguage}}}** — {translation in {{nativeLanguage}}} *({brief nuance note})*
+            * **{example sentence in {{foreignLanguage}}}** — {translation in {{nativeLanguage}}} *({brief nuance note})*
 
             [Input Word]: {{word}}
             """;
@@ -183,9 +200,7 @@ public sealed partial class PromptBuilder
             "{text}"
 
             [Output Format]
-            ### 📝 번역
-
-            (the translation text)
+            (the translation text directly — do NOT include any heading like "번역" or "Translation")
 
             > 💡 **참고**: (brief notes on nuances, formality level, or alternative translations if applicable, written in {nativeLanguage})
             """;
