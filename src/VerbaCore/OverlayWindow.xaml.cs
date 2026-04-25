@@ -23,11 +23,14 @@ public partial class OverlayWindow : Window
     private readonly CapsLockService _capsLockService;
     private readonly CursorTextService _cursorTextService;
 
-    private readonly DispatcherTimer _cursorBlinkTimer;
     private readonly DispatcherTimer _autoHideTimer;
     private CancellationTokenSource? _cts;
     private DateTime _lastRenderTime = DateTime.MinValue;
     private const int RenderThrottleMs = 200;
+
+    // Cached FlowDocument/Run for plain-text streaming — avoids creating new objects every 200ms
+    private Run? _streamingRun;
+    private FlowDocument? _streamingDoc;
 
     private LookupMode _currentMode = LookupMode.Dictionary;
     private readonly LookupMode[] _modes = [LookupMode.Dictionary, LookupMode.Translate, LookupMode.Assist];
@@ -53,6 +56,9 @@ public partial class OverlayWindow : Window
 
     // Cached frozen brushes to avoid GC pressure
     private static readonly SolidColorBrush TextBrush = CreateFrozenBrush(0xE0, 0xFF, 0xFF, 0xFF);
+
+    // GPU-accelerated cursor blink animation (replaces DispatcherTimer that fired 25x/sec on UI thread)
+    private Storyboard? _cursorBlinkStoryboard;
     private static readonly SolidColorBrush WhiteBrush = CreateFrozenBrush(0xFF, 0xFF, 0xFF, 0xFF);
     private static readonly SolidColorBrush ItalicBrush = CreateFrozenBrush(0xD0, 0xCC, 0xDD, 0xFF);
     private static readonly SolidColorBrush CodeFgBrush = CreateFrozenBrush(0xFF, 0xA0, 0xE0, 0xFF);
@@ -88,15 +94,17 @@ public partial class OverlayWindow : Window
 
         InitializeComponent();
 
-        // Cursor blink timer — smooth sine-wave pulse instead of hard toggle
-        _cursorBlinkTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(40) };
-        var _cursorPhase = 0.0;
-        _cursorBlinkTimer.Tick += (_, _) =>
+        // Cursor blink: GPU-accelerated WPF animation instead of DispatcherTimer
+        // This avoids 25 UI-thread callbacks/sec; WPF animations run on the composition thread.
+        _cursorBlinkStoryboard = new Storyboard { RepeatBehavior = RepeatBehavior.Forever };
+        var cursorAnim = new DoubleAnimation(0.3, 0.8, TimeSpan.FromMilliseconds(800))
         {
-            _cursorPhase += 0.08;
-            if (_cursorPhase > 2 * Math.PI) _cursorPhase -= 2 * Math.PI;
-            BlinkingCursor.Opacity = 0.3 + 0.5 * (0.5 + 0.5 * Math.Sin(_cursorPhase));
+            AutoReverse = true,
+            EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut }
         };
+        Storyboard.SetTarget(cursorAnim, BlinkingCursor);
+        Storyboard.SetTargetProperty(cursorAnim, new PropertyPath(OpacityProperty));
+        _cursorBlinkStoryboard.Children.Add(cursorAnim);
 
         // Auto-hide timer (hide result after delay)
         _autoHideTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(120) };
@@ -185,7 +193,7 @@ public partial class OverlayWindow : Window
             var input = InputTextBox.Text.Trim();
             if (!string.IsNullOrEmpty(input))
             {
-                _cursorBlinkTimer.Stop();
+                _cursorBlinkStoryboard?.Stop();
                 BlinkingCursor.Visibility = Visibility.Collapsed;
                 HintLabel.Visibility = Visibility.Collapsed;
                 SafePerformLookup(input);
@@ -253,7 +261,7 @@ public partial class OverlayWindow : Window
             {
                 ShowOverlay();
             }
-            _cursorBlinkTimer.Start();
+            _cursorBlinkStoryboard?.Begin();
         });
     }
 
@@ -270,7 +278,7 @@ public partial class OverlayWindow : Window
                 // Overlay was already showing before this CapsLock press — close it
                 _capsLockService.PersistentModeActive = false;
                 _persistentMode = false;
-                _cursorBlinkTimer.Stop();
+                _cursorBlinkStoryboard?.Stop();
                 HideOverlay();
             }
             else
@@ -331,7 +339,7 @@ public partial class OverlayWindow : Window
         {
             _persistentMode = false;
             _capsLockService.PersistentModeActive = false;
-            _cursorBlinkTimer.Stop();
+            _cursorBlinkStoryboard?.Stop();
             BlinkingCursor.Visibility = Visibility.Collapsed;
             HintLabel.Visibility = Visibility.Collapsed;
 
@@ -370,7 +378,7 @@ public partial class OverlayWindow : Window
                 return;
             }
 
-            _cursorBlinkTimer.Stop();
+            _cursorBlinkStoryboard?.Stop();
             BlinkingCursor.Visibility = Visibility.Collapsed;
             HintLabel.Visibility = Visibility.Collapsed;
 
@@ -535,6 +543,10 @@ public partial class OverlayWindow : Window
         var ct = _cts.Token;
         _isLookupInProgress = true;
 
+        // Reset streaming cache so RenderPlainText creates a fresh document
+        _streamingRun = null;
+        _streamingDoc = null;
+
         // Compact input display for Translate/Assist modes (long text → shrink to summary)
         // Dictionary mode keeps the original large word display
         if (_currentMode is LookupMode.Translate or LookupMode.Assist)
@@ -552,7 +564,7 @@ public partial class OverlayWindow : Window
 
         try
         {
-            var sb = new StringBuilder();
+            var sb = new StringBuilder(1024); // Pre-allocate for typical response size
             var firstChunk = true;
             await foreach (var chunk in _openAiService.StreamCompletionAsync(
                 input, _currentMode, src, tgt, ct))
@@ -794,7 +806,7 @@ public partial class OverlayWindow : Window
         if (!_isShown) return;
 
         _autoHideTimer.Stop();
-        _cursorBlinkTimer.Stop();
+        _cursorBlinkStoryboard?.Stop();
         _cts?.Cancel();
         _cts?.Dispose();
         _cts = null;
@@ -852,7 +864,7 @@ public partial class OverlayWindow : Window
     {
         _isShown = false;
         _autoHideTimer.Stop();
-        _cursorBlinkTimer.Stop();
+        _cursorBlinkStoryboard?.Stop();
         _cts?.Cancel();
         _cts?.Dispose();
         _cts = null;
@@ -874,11 +886,9 @@ public partial class OverlayWindow : Window
     {
         if (_mouseHookId != IntPtr.Zero) return;
         _mouseHookProc = MouseHookCallback;
-        using var process = Process.GetCurrentProcess();
-        using var module = process.MainModule!;
         _mouseHookId = NativeMethods.SetWindowsHookEx(
             NativeMethods.WH_MOUSE_LL, _mouseHookProc,
-            NativeMethods.GetModuleHandle(module.ModuleName), 0);
+            NativeMethods.CachedModuleHandle, 0);
     }
 
     private void UninstallMouseHook()
@@ -922,6 +932,10 @@ public partial class OverlayWindow : Window
 
     private void RenderMarkdown(string markdown)
     {
+        // Release streaming cache before building final Markdown document
+        _streamingRun = null;
+        _streamingDoc = null;
+
         try
         {
             var doc = Markdig.Wpf.Markdown.ToFlowDocument(markdown, MarkdownPipeline);
@@ -936,19 +950,27 @@ public partial class OverlayWindow : Window
 
     /// <summary>
     /// Fast plain-text rendering used during streaming (no Markdown parsing overhead).
+    /// Reuses the same FlowDocument and Run to avoid GC pressure from creating
+    /// new WPF visual tree objects every 200ms.
     /// </summary>
     private void RenderPlainText(string text)
     {
-        var run = new Run(text);
-        var para = new Paragraph(run);
-        var doc = new FlowDocument(para)
+        if (_streamingRun != null && _streamingDoc != null)
+        {
+            _streamingRun.Text = text;
+            return;
+        }
+
+        _streamingRun = new Run(text);
+        var para = new Paragraph(_streamingRun);
+        _streamingDoc = new FlowDocument(para)
         {
             Foreground = TextBrush,
             FontSize = 16,
             FontFamily = AppFontFamily,
             PagePadding = new Thickness(0)
         };
-        ResultViewer.Document = doc;
+        ResultViewer.Document = _streamingDoc;
     }
 
     /// <summary>

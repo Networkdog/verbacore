@@ -15,7 +15,7 @@ public interface IOpenAiService
         string nativeLanguage, string foreignLanguage, CancellationToken ct = default);
 }
 
-public sealed class OpenAiService : IOpenAiService
+public sealed partial class OpenAiService : IOpenAiService
 {
     private static readonly Dictionary<ApiProvider, string> ProviderUrls = new()
     {
@@ -115,7 +115,7 @@ public sealed class OpenAiService : IOpenAiService
         string nativeLanguage, string foreignLanguage, CancellationToken ct = default)
     {
         var request = CreateRequest(input, mode, nativeLanguage, foreignLanguage, stream: false);
-        var json = JsonSerializer.Serialize(request);
+        var json = JsonSerializer.Serialize(request, ApiJsonContext.Default.ChatCompletionRequest);
 
         using var httpRequest = new HttpRequestMessage(HttpMethod.Post, GetApiUrl());
         ApplyAuth(httpRequest);
@@ -125,7 +125,7 @@ public sealed class OpenAiService : IOpenAiService
         await EnsureSuccessOrThrowAsync(response, ct);
 
         var responseJson = await response.Content.ReadAsStringAsync(ct);
-        var result = JsonSerializer.Deserialize<ChatCompletionResponse>(responseJson);
+        var result = JsonSerializer.Deserialize(responseJson, ApiJsonContext.Default.ChatCompletionResponse);
 
         return result?.Choices?.FirstOrDefault()?.Message?.Content ?? string.Empty;
     }
@@ -135,7 +135,7 @@ public sealed class OpenAiService : IOpenAiService
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
     {
         var request = CreateRequest(input, mode, nativeLanguage, foreignLanguage, stream: true);
-        var json = JsonSerializer.Serialize(request);
+        var json = JsonSerializer.Serialize(request, ApiJsonContext.Default.ChatCompletionRequest);
 
         using var httpRequest = new HttpRequestMessage(HttpMethod.Post, GetApiUrl());
         httpRequest.Version = new Version(1, 1); // Force HTTP/1.1 for reliable SSE streaming
@@ -160,27 +160,13 @@ public sealed class OpenAiService : IOpenAiService
             var data = line["data: ".Length..];
             if (data == "[DONE]") yield break;
 
-            // Anthropic SSE uses content_block_delta; OpenAI-compatible uses choices[].delta
+            // Extract content text using Utf8JsonReader — zero-alloc JSON traversal
+            // avoids JsonDocument DOM allocation per SSE chunk
             string? content = null;
             try
             {
-                using var doc = JsonDocument.Parse(data);
-                var root = doc.RootElement;
-
-                if (root.TryGetProperty("choices", out var choices)
-                    && choices.GetArrayLength() > 0
-                    && choices[0].TryGetProperty("delta", out var delta)
-                    && delta.TryGetProperty("content", out var contentProp))
-                {
-                    content = contentProp.GetString();
-                }
-                else if (root.TryGetProperty("type", out var typeProp)
-                         && typeProp.GetString() == "content_block_delta"
-                         && root.TryGetProperty("delta", out var anthropicDelta)
-                         && anthropicDelta.TryGetProperty("text", out var textProp))
-                {
-                    content = textProp.GetString();
-                }
+                var bytes = Encoding.UTF8.GetBytes(data);
+                content = ExtractStreamContent(bytes);
             }
             catch (JsonException) { continue; }
 
@@ -259,6 +245,55 @@ public sealed class OpenAiService : IOpenAiService
         return false;
     }
 
+    // --- SSE content extraction ---
+
+    /// <summary>
+    /// Extracts the content text from an SSE chunk using Utf8JsonReader (zero-alloc traversal).
+    /// Supports OpenAI-compatible (choices[0].delta.content) and Anthropic (delta.text) formats.
+    /// </summary>
+    private static string? ExtractStreamContent(ReadOnlySpan<byte> utf8Json)
+    {
+        var reader = new Utf8JsonReader(utf8Json);
+        string? content = null;
+        var isAnthropicDelta = false;
+        var depth = 0;
+
+        while (reader.Read())
+        {
+            if (reader.TokenType == JsonTokenType.PropertyName)
+            {
+                if (reader.ValueTextEquals("content"u8) && depth >= 2)
+                {
+                    // OpenAI: choices[0].delta.content
+                    if (reader.Read() && reader.TokenType == JsonTokenType.String)
+                        content = reader.GetString();
+                }
+                else if (reader.ValueTextEquals("text"u8) && isAnthropicDelta)
+                {
+                    // Anthropic: delta.text
+                    if (reader.Read() && reader.TokenType == JsonTokenType.String)
+                        content = reader.GetString();
+                }
+                else if (reader.ValueTextEquals("type"u8) && depth == 1)
+                {
+                    if (reader.Read() && reader.TokenType == JsonTokenType.String
+                        && reader.ValueTextEquals("content_block_delta"u8))
+                        isAnthropicDelta = true;
+                }
+                else if (reader.ValueTextEquals("delta"u8))
+                {
+                    // Mark that we're entering a delta object
+                }
+            }
+            else if (reader.TokenType == JsonTokenType.StartObject || reader.TokenType == JsonTokenType.StartArray)
+                depth++;
+            else if (reader.TokenType == JsonTokenType.EndObject || reader.TokenType == JsonTokenType.EndArray)
+                depth--;
+        }
+
+        return content;
+    }
+
     // --- Request/Response DTOs ---
 
     private sealed class ChatCompletionRequest
@@ -298,4 +333,9 @@ public sealed class OpenAiService : IOpenAiService
     {
         [JsonPropertyName("message")] public ChatMessage? Message { get; set; }
     }
+
+    // Source-generated JSON context for API DTOs — eliminates reflection overhead
+    [JsonSerializable(typeof(ChatCompletionRequest))]
+    [JsonSerializable(typeof(ChatCompletionResponse))]
+    private sealed partial class ApiJsonContext : JsonSerializerContext;
 }

@@ -12,12 +12,6 @@ public sealed class SettingsService
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "VerbaCore");
     private static readonly string SettingsPath = Path.Combine(SettingsDir, "settings.json");
 
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        WriteIndented = true,
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-    };
-
     private AppSettings _current = new();
     private CancellationTokenSource? _debounceCts;
 
@@ -38,7 +32,7 @@ public sealed class SettingsService
         try
         {
             var json = await File.ReadAllTextAsync(SettingsPath);
-            _current = JsonSerializer.Deserialize<AppSettings>(json, JsonOptions) ?? new AppSettings();
+            _current = JsonSerializer.Deserialize(json, SettingsJsonContext.Default.AppSettings) ?? new AppSettings();
         }
         catch (JsonException)
         {
@@ -86,7 +80,7 @@ public sealed class SettingsService
             OverlaySize = _current.OverlaySize
         };
 
-        var json = JsonSerializer.Serialize(toSave, JsonOptions);
+        var json = JsonSerializer.Serialize(toSave, SettingsJsonContext.Default.AppSettings);
         await File.WriteAllTextAsync(SettingsPath, json);
     }
 

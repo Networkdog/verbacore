@@ -37,6 +37,9 @@
                  ItemsSource="{Binding HistoryItems}"
                  Background="Transparent"
                  BorderThickness="0"
+                 VirtualizingPanel.IsVirtualizing="True"
+                 VirtualizingPanel.VirtualizationMode="Recycling"
+                 VirtualizingPanel.ScrollUnit="Pixel"
                  ScrollViewer.HorizontalScrollBarVisibility="Disabled">
             <ListBox.ItemTemplate>
                 <DataTemplate>

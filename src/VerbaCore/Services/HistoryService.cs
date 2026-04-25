@@ -10,14 +10,9 @@ public sealed class HistoryService
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "VerbaCore");
     private static readonly string HistoryPath = Path.Combine(HistoryDir, "history.json");
 
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        WriteIndented = false,
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-    };
-
     private const int MaxItems = 200;
     private LookupHistory _history = new();
+    private CancellationTokenSource? _saveDebounceCts;
 
     public IReadOnlyList<LookupHistoryItem> Items => _history.Items.AsReadOnly();
 
@@ -32,7 +27,7 @@ public sealed class HistoryService
         try
         {
             var json = await File.ReadAllTextAsync(HistoryPath);
-            _history = JsonSerializer.Deserialize<LookupHistory>(json, JsonOptions) ?? new LookupHistory();
+            _history = JsonSerializer.Deserialize(json, HistoryJsonContext.Default.LookupHistory) ?? new LookupHistory();
         }
         catch (System.Text.Json.JsonException)
         {
@@ -41,7 +36,7 @@ public sealed class HistoryService
         }
     }
 
-    public async Task AddAsync(LookupHistoryItem item)
+    public Task AddAsync(LookupHistoryItem item)
     {
         _history.Items.Insert(0, item);
 
@@ -51,25 +46,43 @@ public sealed class HistoryService
             _history.Items.RemoveRange(MaxItems, _history.Items.Count - MaxItems);
         }
 
-        await SaveAsync();
+        // Debounced save — coalesces rapid successive lookups into a single write after 500ms
+        QueueSave();
+        return Task.CompletedTask;
     }
 
     public async Task ClearAsync()
     {
         _history.Items.Clear();
-        await SaveAsync();
+        await SaveNowAsync();
     }
 
     public async Task DeleteAsync(LookupHistoryItem item)
     {
         _history.Items.Remove(item);
-        await SaveAsync();
+        await SaveNowAsync();
     }
 
-    private async Task SaveAsync()
+    /// <summary>
+    /// Debounced save — coalesces rapid successive calls into a single write after 500ms.
+    /// Avoids redundant full-file rewrites when multiple lookups happen in quick succession.
+    /// </summary>
+    private void QueueSave()
+    {
+        _saveDebounceCts?.Cancel();
+        _saveDebounceCts = new CancellationTokenSource();
+        var ct = _saveDebounceCts.Token;
+        _ = Task.Delay(500, ct).ContinueWith(async _ =>
+        {
+            if (!ct.IsCancellationRequested)
+                await SaveNowAsync();
+        }, ct, TaskContinuationOptions.OnlyOnRanToCompletion, TaskScheduler.Default);
+    }
+
+    private async Task SaveNowAsync()
     {
         Directory.CreateDirectory(HistoryDir);
-        var json = JsonSerializer.Serialize(_history, JsonOptions);
+        var json = JsonSerializer.Serialize(_history, HistoryJsonContext.Default.LookupHistory);
         await File.WriteAllTextAsync(HistoryPath, json);
     }
 }

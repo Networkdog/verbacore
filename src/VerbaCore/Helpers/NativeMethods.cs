@@ -137,4 +137,23 @@ internal static class NativeMethods
     // Shell tray icon
     [DllImport("shell32.dll")]
     public static extern IntPtr ExtractIcon(IntPtr hInst, string lpszExeFileName, int nIconIndex);
+
+    /// <summary>
+    /// Cached module handle for the main module — avoids Process.GetCurrentProcess() + MainModule
+    /// allocation on every hook install/reinstall.
+    /// </summary>
+    private static IntPtr s_cachedModuleHandle;
+    public static IntPtr CachedModuleHandle
+    {
+        get
+        {
+            if (s_cachedModuleHandle == IntPtr.Zero)
+            {
+                using var process = System.Diagnostics.Process.GetCurrentProcess();
+                using var module = process.MainModule!;
+                s_cachedModuleHandle = GetModuleHandle(module.ModuleName);
+            }
+            return s_cachedModuleHandle;
+        }
+    }
 }

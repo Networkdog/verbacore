@@ -56,12 +56,10 @@ public sealed class CapsLockService : IDisposable
     public void Install()
     {
         _hookProc = HookCallback;
-        using var process = Process.GetCurrentProcess();
-        using var module = process.MainModule!;
         _hookId = NativeMethods.SetWindowsHookEx(
             NativeMethods.WH_KEYBOARD_LL,
             _hookProc,
-            NativeMethods.GetModuleHandle(module.ModuleName),
+            NativeMethods.CachedModuleHandle,
             0);
 
         // Force CapsLock OFF after hook is installed
