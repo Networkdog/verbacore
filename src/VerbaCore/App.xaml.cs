@@ -136,21 +136,35 @@ public partial class App : Application
 
     private static Icon LoadTrayIcon()
     {
-        // Look for icon.png next to the exe first, then fall back to project-relative path
         var exeDir = AppContext.BaseDirectory;
-        var candidates = new[]
+
+        // 1. Try .ico files first (native icon format, best quality)
+        var icoCandidates = new[]
+        {
+            System.IO.Path.Combine(exeDir, "res", "icons", "verbacore.ico"),
+            System.IO.Path.Combine(exeDir, "..", "..", "..", "..", "..", "res", "icons", "verbacore.ico"),
+        };
+
+        foreach (var path in icoCandidates)
+        {
+            if (!System.IO.File.Exists(path)) continue;
+            try { return new Icon(path, 32, 32); }
+            catch { /* fall through */ }
+        }
+
+        // 2. Fall back to .png conversion
+        var pngCandidates = new[]
         {
             System.IO.Path.Combine(exeDir, "res", "icons", "verbacore.png"),
             System.IO.Path.Combine(exeDir, "..", "..", "..", "..", "..", "res", "icons", "verbacore.png"),
         };
 
-        foreach (var path in candidates)
+        foreach (var path in pngCandidates)
         {
             if (!System.IO.File.Exists(path)) continue;
             using var bmp = new Bitmap(path);
             var hIcon = bmp.GetHicon();
             var icon = Icon.FromHandle(hIcon);
-            // Clone to take ownership; FromHandle doesn't own the HICON
             var cloned = (Icon)icon.Clone();
             icon.Dispose();
             Helpers.NativeMethods.DestroyIcon(hIcon);

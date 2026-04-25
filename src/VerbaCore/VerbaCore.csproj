@@ -38,6 +38,9 @@
     <Content Include="..\..\res\icons\verbacore.png" Link="res\icons\verbacore.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <Content Include="..\..\res\icons\verbacore.ico" Link="res\icons\verbacore.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 
 </Project>

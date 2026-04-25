@@ -37,6 +37,8 @@ Name: "startup"; Description: "Windows 시작 시 자동 실행"; GroupDescripti
 
 [Files]
 Source: "publish-standalone\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
+Source: "res\icons\verbacore.ico"; DestDir: "{app}\res\icons"; Flags: ignoreversion
+Source: "res\icons\verbacore.png"; DestDir: "{app}\res\icons"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
@@ -47,7 +49,14 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: de
 Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "{#MyAppName}"; ValueData: """{app}\{#MyAppExeName}"""; Flags: uninsdeletevalue; Tasks: startup
 
 [Run]
-Filename: "{app}\{#MyAppExeName}"; Description: "{#MyAppName} 실행"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\{#MyAppExeName}"; Description: "{#MyAppName} 실행"; Flags: nowait postinstall skipifsilent runasoriginaluser
+Filename: "{app}\{#MyAppExeName}"; Flags: nowait skipifdoesntexist runasoriginaluser; Check: IsSilentInstall
 
 [UninstallDelete]
 Type: filesandordirs; Name: "{localappdata}\VerbaCore"
+
+[Code]
+function IsSilentInstall: Boolean;
+begin
+  Result := WizardSilent;
+end;
