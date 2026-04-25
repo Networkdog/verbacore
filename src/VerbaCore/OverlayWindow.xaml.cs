@@ -30,7 +30,7 @@ public partial class OverlayWindow : Window
     private const int RenderThrottleMs = 200;
 
     private LookupMode _currentMode = LookupMode.Dictionary;
-    private readonly LookupMode[] _modes = [LookupMode.Dictionary, LookupMode.Translate];
+    private readonly LookupMode[] _modes = [LookupMode.Dictionary, LookupMode.Translate, LookupMode.Assist];
     private int _modeIndex;
 
     /// <summary>Whether the overlay is in persistent (quick-tap) mode.</summary>
@@ -411,6 +411,7 @@ public partial class OverlayWindow : Window
         {
             LookupMode.Dictionary => "📖 사전",
             LookupMode.Translate => "🔄 번역",
+            LookupMode.Assist => "💡 도우미",
             _ => "📖 사전"
         };
     }
@@ -518,7 +519,13 @@ public partial class OverlayWindow : Window
         if (!_userExplicitlySetMode)
         {
             _currentMode = PromptBuilder.AutoSelectMode(input);
-            _modeIndex = _currentMode == LookupMode.Dictionary ? 0 : 1;
+            _modeIndex = _currentMode switch
+            {
+                LookupMode.Dictionary => 0,
+                LookupMode.Translate => 1,
+                LookupMode.Assist => 2,
+                _ => 0
+            };
             UpdateModeLabel();
         }
 
@@ -528,9 +535,9 @@ public partial class OverlayWindow : Window
         var ct = _cts.Token;
         _isLookupInProgress = true;
 
-        // Compact input display only for Translate mode (long text → shrink to summary)
+        // Compact input display for Translate/Assist modes (long text → shrink to summary)
         // Dictionary mode keeps the original large word display
-        if (_currentMode == LookupMode.Translate)
+        if (_currentMode is LookupMode.Translate or LookupMode.Assist)
             CompactInputDisplay(input);
 
         // Show loading indicator until first chunk arrives

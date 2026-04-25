@@ -1,17 +1,77 @@
+using System.Text.RegularExpressions;
 using VerbaCore.Models;
 
 namespace VerbaCore.Services;
 
-public sealed class PromptBuilder
+public sealed partial class PromptBuilder
 {
     /// <summary>
-    /// Auto-selects Dictionary for short input (≤3 words), Translate for longer input.
+    /// Auto-selects the best mode for the given input:
+    /// - Natural language words/phrases (≤3 words) → Dictionary
+    /// - Natural language sentences (>3 words) → Translate
+    /// - Code, formulas, URLs, structured data, etc. → Assist
     /// </summary>
     public static LookupMode AutoSelectMode(string input)
     {
-        var wordCount = input.Trim().Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).Length;
+        var trimmed = input.Trim();
+        if (string.IsNullOrEmpty(trimmed)) return LookupMode.Dictionary;
+
+        // Detect non-language content → Assist mode
+        if (LooksLikeNonLanguage(trimmed))
+            return LookupMode.Assist;
+
+        var wordCount = trimmed.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).Length;
         return wordCount <= 3 ? LookupMode.Dictionary : LookupMode.Translate;
     }
+
+    /// <summary>
+    /// Heuristic: returns true if the input looks like code, a formula, a URL,
+    /// a file path, structured data, or other non-natural-language content.
+    /// </summary>
+    private static bool LooksLikeNonLanguage(string input)
+    {
+        // URL or URI scheme
+        if (UrlPattern().IsMatch(input)) return true;
+
+        // File paths (Windows or Unix)
+        if (FilePathPattern().IsMatch(input)) return true;
+
+        // Code-like: contains braces, semicolons, arrows, assignment operators, etc.
+        // Threshold: ≥ 2 code indicators in the input
+        var codeIndicators = 0;
+        if (input.Contains('{') || input.Contains('}')) codeIndicators++;
+        if (input.Contains(';') && !input.EndsWith(';')) codeIndicators++; // semicolons mid-text
+        if (input.Contains("=>") || input.Contains("->")) codeIndicators++;
+        if (input.Contains("==") || input.Contains("!=") || input.Contains("&&") || input.Contains("||")) codeIndicators++;
+        if (input.Contains("()") || input.Contains("();")) codeIndicators++;
+        if (input.Contains("/**") || input.Contains("///") || input.Contains("//") || input.Contains("/*")) codeIndicators++;
+        if (input.Contains("def ") || input.Contains("class ") || input.Contains("function ")
+            || input.Contains("import ") || input.Contains("using ") || input.Contains("#include")) codeIndicators++;
+        if (codeIndicators >= 2) return true;
+
+        // Math/formula: lots of operators, digits, and symbols
+        var symbolRatio = (double)input.Count(c => "=+*/<>^|&%$#@~`\\[]".Contains(c)) / input.Length;
+        if (symbolRatio > 0.15 && input.Length > 5) return true;
+
+        // Stack traces, error messages with line numbers
+        if (StackTracePattern().IsMatch(input)) return true;
+
+        // JSON/XML-like
+        if ((input.StartsWith('{') && input.EndsWith('}')) ||
+            (input.StartsWith('[') && input.EndsWith(']')) ||
+            (input.StartsWith('<') && input.EndsWith('>'))) return true;
+
+        return false;
+    }
+
+    [GeneratedRegex(@"^https?://|^ftp://|^file://|^[a-zA-Z][a-zA-Z0-9+.-]*://", RegexOptions.IgnoreCase)]
+    private static partial Regex UrlPattern();
+
+    [GeneratedRegex(@"^[A-Za-z]:\\|^/[a-z]|^\./|^\.\./|^~/", RegexOptions.IgnoreCase)]
+    private static partial Regex FilePathPattern();
+
+    [GeneratedRegex(@"at .+\.(cs|java|py|js|ts|cpp|go|rb):\d+|line \d+|\.cs\(\d+|Exception:|Traceback", RegexOptions.IgnoreCase)]
+    private static partial Regex StackTracePattern();
 
     public string Build(string input, LookupMode mode, string nativeLanguage, string foreignLanguage)
     {
@@ -19,6 +79,7 @@ public sealed class PromptBuilder
         {
             LookupMode.Dictionary => BuildDictionaryPrompt(input, nativeLanguage, foreignLanguage),
             LookupMode.Translate => BuildTranslatePrompt(input, nativeLanguage, foreignLanguage),
+            LookupMode.Assist => BuildAssistPrompt(input, nativeLanguage, foreignLanguage),
             _ => BuildDictionaryPrompt(input, nativeLanguage, foreignLanguage)
         };
     }
@@ -46,7 +107,13 @@ public sealed class PromptBuilder
                 $"Provide accurate translations with brief notes on nuances when applicable. " +
                 "Use markdown formatting for readability.",
 
-            _ => "You are a helpful language assistant."
+            LookupMode.Assist =>
+                $"You are a knowledgeable assistant. The user's native language is {nativeLanguage}. " +
+                $"The user has selected some text (code, a URL, an error message, a formula, or other non-language content) and wants to understand it. " +
+                $"Infer what the user most likely wants to know about the given text, and answer that question directly in {nativeLanguage}. " +
+                $"Be concise but thorough. Use markdown formatting.",
+
+            _ => "You are a helpful assistant."
         };
     }
 
@@ -121,6 +188,37 @@ public sealed class PromptBuilder
             (the translation text)
 
             > 💡 **참고**: (brief notes on nuances, formality level, or alternative translations if applicable, written in {nativeLanguage})
+            """;
+    }
+
+    private static string BuildAssistPrompt(string text, string nativeLanguage, string foreignLanguage)
+    {
+        return $"""
+            [Rules]
+            - The user's native language is {nativeLanguage}.
+            - The user has selected the following text and wants to understand it.
+            - Analyze the text and determine what it is (code, error message, URL, formula, config, log, data, etc.).
+            - Infer the most useful question the user would ask about this text, and answer it.
+            - Examples of useful responses:
+              • Code snippet → explain what it does, key logic, potential issues
+              • Error/stack trace → explain the cause and suggest fixes
+              • URL → describe what the link points to and its purpose
+              • Formula/expression → explain the meaning and result
+              • Config/JSON/XML → explain the structure and key settings
+              • Log output → summarize what happened and highlight important entries
+            - Write the entire response in {nativeLanguage}.
+            - Use rich markdown formatting for readability.
+            - Be concise but thorough — aim for practical, actionable insight.
+
+            [Input Text]
+            ```
+            {text}
+            ```
+
+            [Output Format]
+            ### 💡 (a short title describing what the input is, in {nativeLanguage})
+
+            (clear, practical explanation in {nativeLanguage})
             """;
     }
 }

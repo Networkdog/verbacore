@@ -14,5 +14,6 @@ public sealed class LookupResult
 public enum LookupMode
 {
     Dictionary,
-    Translate
+    Translate,
+    Assist
 }
