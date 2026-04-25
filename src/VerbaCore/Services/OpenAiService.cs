@@ -8,11 +8,11 @@ namespace VerbaCore.Services;
 
 public interface IOpenAiService
 {
-    Task<string> GetCompletionAsync(string input, LookupMode mode, string sourceLanguage,
-        string targetLanguage, CancellationToken ct = default);
+    Task<string> GetCompletionAsync(string input, LookupMode mode, string nativeLanguage,
+        string foreignLanguage, CancellationToken ct = default);
 
     IAsyncEnumerable<string> StreamCompletionAsync(string input, LookupMode mode,
-        string sourceLanguage, string targetLanguage, CancellationToken ct = default);
+        string nativeLanguage, string foreignLanguage, CancellationToken ct = default);
 }
 
 public sealed class OpenAiService : IOpenAiService
@@ -112,9 +112,9 @@ public sealed class OpenAiService : IOpenAiService
     }
 
     public async Task<string> GetCompletionAsync(string input, LookupMode mode,
-        string sourceLanguage, string targetLanguage, CancellationToken ct = default)
+        string nativeLanguage, string foreignLanguage, CancellationToken ct = default)
     {
-        var request = CreateRequest(input, mode, sourceLanguage, targetLanguage, stream: false);
+        var request = CreateRequest(input, mode, nativeLanguage, foreignLanguage, stream: false);
         var json = JsonSerializer.Serialize(request);
 
         using var httpRequest = new HttpRequestMessage(HttpMethod.Post, GetApiUrl());
@@ -131,10 +131,10 @@ public sealed class OpenAiService : IOpenAiService
     }
 
     public async IAsyncEnumerable<string> StreamCompletionAsync(string input, LookupMode mode,
-        string sourceLanguage, string targetLanguage,
+        string nativeLanguage, string foreignLanguage,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
     {
-        var request = CreateRequest(input, mode, sourceLanguage, targetLanguage, stream: true);
+        var request = CreateRequest(input, mode, nativeLanguage, foreignLanguage, stream: true);
         var json = JsonSerializer.Serialize(request);
 
         using var httpRequest = new HttpRequestMessage(HttpMethod.Post, GetApiUrl());
@@ -192,7 +192,7 @@ public sealed class OpenAiService : IOpenAiService
     }
 
     private ChatCompletionRequest CreateRequest(string input, LookupMode mode,
-        string sourceLanguage, string targetLanguage, bool stream)
+        string nativeLanguage, string foreignLanguage, bool stream)
     {
         var effort = _settings.Current.ReasoningEffort;
         var isReasoning = !string.IsNullOrEmpty(effort) && effort != "none";
@@ -211,12 +211,12 @@ public sealed class OpenAiService : IOpenAiService
                 {
                     // Reasoning models use "developer" role instead of "system"
                     Role = isReasoning ? "developer" : "system",
-                    Content = _promptBuilder.GetSystemMessage(mode)
+                    Content = _promptBuilder.GetSystemMessage(mode, nativeLanguage, foreignLanguage)
                 },
                 new ChatMessage
                 {
                     Role = "user",
-                    Content = _promptBuilder.Build(input, mode, sourceLanguage, targetLanguage)
+                    Content = _promptBuilder.Build(input, mode, nativeLanguage, foreignLanguage)
                 }
             ],
             // Reasoning-capable models don't support temperature

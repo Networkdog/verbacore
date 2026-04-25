@@ -1,7 +1,9 @@
+using System.Diagnostics;
 using System.Net.Http;
 using System.Text;
 using System.Windows;
 using System.Windows.Documents;
+using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
@@ -41,8 +43,9 @@ public partial class OverlayWindow : Window
     private string? _grabbedSelectedText;
     /// <summary>True while an API lookup is actively streaming.</summary>
     private bool _isLookupInProgress;
-    /// <summary>Guard flag: suppresses Deactivated during show/activate sequences to prevent flicker.</summary>
-    private bool _isActivating;
+    // Global mouse hook to detect clicks outside the overlay
+    private IntPtr _mouseHookId = IntPtr.Zero;
+    private NativeMethods.LowLevelMouseProc? _mouseHookProc;
 
     private static readonly MarkdownPipeline MarkdownPipeline = new MarkdownPipelineBuilder()
         .UseSupportedExtensions()
@@ -109,15 +112,6 @@ public partial class OverlayWindow : Window
         _capsLockService.LongPressReleased += OnLongPressReleased;
         _capsLockService.BufferChanged += OnBufferChanged;
         _capsLockService.EnterPressed += OnEnterPressed;
-
-        // Close overlay when it loses focus (user clicked outside)
-        // Don't auto-close during an active API lookup — user can still Esc/CapsLock to close
-        // Don't auto-close while activating (ForceActivate may cause transient focus loss)
-        Deactivated += (_, _) =>
-        {
-            if (_isShown && !_isLookupInProgress && !_isActivating)
-                HideOverlay();
-        };
 
         // Handle Tab key for mode switching (in the keyboard hook)
         PreviewKeyDown += (_, e) =>
@@ -285,7 +279,6 @@ public partial class OverlayWindow : Window
                 // First quick tap — enter persistent mode with IME TextBox
                 _persistentMode = true;
                 _capsLockService.PersistentModeActive = false; // Don't intercept keys — let TextBox handle them
-                StatusLabel.Text = "단어를 입력하세요 — Enter: 조회, CapsLock: 닫기";
 
                 // Switch to TextBox UI
                 InputDisplay.Text = "";
@@ -305,17 +298,25 @@ public partial class OverlayWindow : Window
                     ShowOverlay();
                 }
 
-                // Focus the TextBox for IME input — use ForceActivate to steal focus from other apps
-                ForceActivate();
-                Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Input, () =>
+                // If we grabbed selected text, auto-trigger lookup immediately
+                if (!string.IsNullOrWhiteSpace(_grabbedSelectedText))
                 {
+                    HintLabel.Visibility = Visibility.Collapsed;
+                    SafePerformLookup(_grabbedSelectedText.Trim());
+                }
+                else
+                {
+                    StatusLabel.Text = "단어를 입력하세요 — Enter: 조회, CapsLock: 닫기";
+
+                    // Focus the TextBox for IME input — use ForceActivate to steal focus from other apps
                     ForceActivate();
-                    InputTextBox.Focus();
-                    System.Windows.Input.Keyboard.Focus(InputTextBox);
-                    // Select all so typing replaces the pre-filled text
-                    if (!string.IsNullOrEmpty(InputTextBox.Text))
-                        InputTextBox.SelectAll();
-                });
+                    Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Input, () =>
+                    {
+                        ForceActivate();
+                        InputTextBox.Focus();
+                        System.Windows.Input.Keyboard.Focus(InputTextBox);
+                    });
+                }
             }
         });
     }
@@ -412,10 +413,6 @@ public partial class OverlayWindow : Window
             LookupMode.Translate => "🔄 번역",
             _ => "📖 사전"
         };
-
-        var src = _settingsService.Current.SourceLanguage;
-        var tgt = _settingsService.Current.TargetLanguage;
-        LangLabel.Text = $"{LangCode(src)} → {LangCode(tgt)}";
     }
 
     private void UpdateCursorPosition()
@@ -543,8 +540,8 @@ public partial class OverlayWindow : Window
         spinnerStoryboard.Begin(LoadingPanel, true);
         StatusLabel.Text = "";
 
-        var src = _settingsService.Current.SourceLanguage;
-        var tgt = _settingsService.Current.TargetLanguage;
+        var src = _settingsService.Current.NativeLanguage;
+        var tgt = _settingsService.Current.ForeignLanguage;
 
         try
         {
@@ -582,8 +579,8 @@ public partial class OverlayWindow : Window
                 Input = input,
                 Mode = _currentMode,
                 Response = sb.ToString(),
-                SourceLanguage = src,
-                TargetLanguage = tgt
+                SourceLanguage = tgt, // ForeignLanguage
+                TargetLanguage = src  // NativeLanguage
             });
 
             // Auto-hide after delay
@@ -673,41 +670,31 @@ public partial class OverlayWindow : Window
     /// <summary>
     /// Forces the overlay to the foreground using Win32 AttachThreadInput trick.
     /// WPF's Activate() alone may fail when another app holds foreground lock.
-    /// Sets <see cref="_isActivating"/> to suppress Deactivated during the process.
     /// </summary>
     private void ForceActivate()
     {
-        _isActivating = true;
-        try
-        {
-            var hwnd = new System.Windows.Interop.WindowInteropHelper(this).Handle;
-            if (hwnd == IntPtr.Zero) return;
+        var hwnd = new WindowInteropHelper(this).Handle;
+        if (hwnd == IntPtr.Zero) return;
 
-            var foregroundHwnd = NativeMethods.GetForegroundWindow();
-            if (foregroundHwnd != IntPtr.Zero && foregroundHwnd != hwnd)
+        var foregroundHwnd = NativeMethods.GetForegroundWindow();
+        if (foregroundHwnd != IntPtr.Zero && foregroundHwnd != hwnd)
+        {
+            var foregroundThread = NativeMethods.GetWindowThreadProcessId(foregroundHwnd, out _);
+            var currentThread = NativeMethods.GetCurrentThreadId();
+
+            if (foregroundThread != currentThread)
             {
-                var foregroundThread = NativeMethods.GetWindowThreadProcessId(foregroundHwnd, out _);
-                var currentThread = NativeMethods.GetCurrentThreadId();
-
-                if (foregroundThread != currentThread)
-                {
-                    NativeMethods.AttachThreadInput(foregroundThread, currentThread, true);
-                    NativeMethods.SetForegroundWindow(hwnd);
-                    NativeMethods.AttachThreadInput(foregroundThread, currentThread, false);
-                }
-                else
-                {
-                    NativeMethods.SetForegroundWindow(hwnd);
-                }
+                NativeMethods.AttachThreadInput(foregroundThread, currentThread, true);
+                NativeMethods.SetForegroundWindow(hwnd);
+                NativeMethods.AttachThreadInput(foregroundThread, currentThread, false);
             }
+            else
+            {
+                NativeMethods.SetForegroundWindow(hwnd);
+            }
+        }
 
-            Activate();
-        }
-        finally
-        {
-            // Clear the guard after a short delay so any queued Deactivated events are suppressed
-            Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background, () => _isActivating = false);
-        }
+        Activate();
     }
 
     private void ShowOverlay()
@@ -755,7 +742,6 @@ public partial class OverlayWindow : Window
         };
 
         _isShown = true;
-        _isActivating = true;
 
         // Reset animation state
         BeginAnimation(OpacityProperty, null);
@@ -772,6 +758,7 @@ public partial class OverlayWindow : Window
         Show();
 
         ForceActivate();
+        InstallMouseHook();
 
         // Entrance animation: fade + scale up + slide up
         var duration = TimeSpan.FromMilliseconds(220);
@@ -808,6 +795,7 @@ public partial class OverlayWindow : Window
         _persistentMode = false;
         _userExplicitlySetMode = false;
         _capsLockService.PersistentModeActive = false;
+        UninstallMouseHook();
 
         // Reset TextBox/TextBlock visibility
         InputTextBox.Visibility = Visibility.Collapsed;
@@ -861,6 +849,7 @@ public partial class OverlayWindow : Window
         _cts?.Cancel();
         _cts?.Dispose();
         _cts = null;
+        UninstallMouseHook();
 
         // Unsubscribe to avoid Deactivated handler firing during close
         _capsLockService.CapsLockPressed -= OnCapsLockPressed;
@@ -872,25 +861,57 @@ public partial class OverlayWindow : Window
         Close();
     }
 
-    private static string LangCode(string lang) => lang switch
+    #region Global Mouse Hook — click-outside detection
+
+    private void InstallMouseHook()
     {
-        "English" => "EN",
-        "Korean" => "KO",
-        "Japanese" => "JA",
-        "Chinese" => "ZH",
-        "Spanish" => "ES",
-        "French" => "FR",
-        "German" => "DE",
-        "Portuguese" => "PT",
-        "Russian" => "RU",
-        "Arabic" => "AR",
-        "Italian" => "IT",
-        "Dutch" => "NL",
-        "Vietnamese" => "VI",
-        "Thai" => "TH",
-        "Indonesian" => "ID",
-        _ => lang.Length >= 2 ? lang[..2].ToUpperInvariant() : lang.ToUpperInvariant()
-    };
+        if (_mouseHookId != IntPtr.Zero) return;
+        _mouseHookProc = MouseHookCallback;
+        using var process = Process.GetCurrentProcess();
+        using var module = process.MainModule!;
+        _mouseHookId = NativeMethods.SetWindowsHookEx(
+            NativeMethods.WH_MOUSE_LL, _mouseHookProc,
+            NativeMethods.GetModuleHandle(module.ModuleName), 0);
+    }
+
+    private void UninstallMouseHook()
+    {
+        if (_mouseHookId == IntPtr.Zero) return;
+        NativeMethods.UnhookWindowsHookEx(_mouseHookId);
+        _mouseHookId = IntPtr.Zero;
+        _mouseHookProc = null;
+    }
+
+    private IntPtr MouseHookCallback(int nCode, IntPtr wParam, IntPtr lParam)
+    {
+        if (nCode >= 0 && _isShown)
+        {
+            var msg = (int)wParam;
+            if (msg is NativeMethods.WM_LBUTTONDOWN or NativeMethods.WM_RBUTTONDOWN
+                    or NativeMethods.WM_MBUTTONDOWN or NativeMethods.WM_NCLBUTTONDOWN)
+            {
+                var hookData = System.Runtime.InteropServices.Marshal.PtrToStructure<NativeMethods.MSLLHOOKSTRUCT>(lParam);
+                var hwnd = new WindowInteropHelper(this).Handle;
+                if (hwnd != IntPtr.Zero
+                    && NativeMethods.GetWindowRect(hwnd, out var rect)
+                    && !PtInRect(rect, hookData.pt))
+                {
+                    // Click was outside the overlay — hide it on the UI thread
+                    Dispatcher.BeginInvoke(() =>
+                    {
+                        if (_isShown)
+                            HideOverlay();
+                    });
+                }
+            }
+        }
+        return NativeMethods.CallNextHookEx(_mouseHookId, nCode, wParam, lParam);
+    }
+
+    private static bool PtInRect(NativeMethods.RECT rect, NativeMethods.POINT pt)
+        => pt.X >= rect.Left && pt.X < rect.Right && pt.Y >= rect.Top && pt.Y < rect.Bottom;
+
+    #endregion
 
     private void RenderMarkdown(string markdown)
     {

@@ -92,6 +92,12 @@ public partial class SettingsViewModel : ObservableObject
     private string _globalHotkey = "Ctrl+Alt+V";
 
     [ObservableProperty]
+    private string _nativeLanguage = "Korean";
+
+    [ObservableProperty]
+    private string _foreignLanguage = "English";
+
+    [ObservableProperty]
     private string _statusMessage = string.Empty;
 
     public ObservableCollection<string> AvailableModels { get; } = new();
@@ -105,6 +111,13 @@ public partial class SettingsViewModel : ObservableObject
         "왼쪽 아래", "아래 가운데", "오른쪽 아래"
     ];
     public string[] AvailableSizes { get; } = ["작게", "중간", "크게"];
+    public string[] AvailableLanguages { get; } =
+    [
+        "Korean", "English", "Japanese", "Chinese", "Spanish", "French",
+        "German", "Portuguese", "Russian", "Arabic", "Italian", "Dutch",
+        "Vietnamese", "Thai", "Indonesian", "Hindi", "Turkish", "Polish",
+        "Swedish", "Czech"
+    ];
 
     public SettingsViewModel(SettingsService settingsService)
     {
@@ -147,6 +160,8 @@ public partial class SettingsViewModel : ObservableObject
         CustomEndpoint = s.CustomEndpoint;
         StartWithWindows = s.StartWithWindows;
         GlobalHotkey = s.GlobalHotkey;
+        NativeLanguage = s.NativeLanguage;
+        ForeignLanguage = s.ForeignLanguage;
         SelectedTheme = s.Theme switch
         {
             ThemeMode.Light => "Light",
@@ -212,6 +227,8 @@ public partial class SettingsViewModel : ObservableObject
         s.CustomEndpoint = CustomEndpoint;
         s.StartWithWindows = StartWithWindows;
         s.GlobalHotkey = GlobalHotkey;
+        s.NativeLanguage = NativeLanguage;
+        s.ForeignLanguage = ForeignLanguage;
         s.Theme = SelectedTheme switch
         {
             "Light" => ThemeMode.Light,

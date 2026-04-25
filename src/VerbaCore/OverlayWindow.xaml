@@ -58,17 +58,6 @@
                                    Foreground="#B0FFFFFF"
                                    VerticalAlignment="Center" />
                     </Border>
-                    <TextBlock Text="  ·  "
-                               FontSize="14"
-                               FontFamily="{StaticResource AppUIFont}"
-                               Foreground="#30FFFFFF"
-                               VerticalAlignment="Center" />
-                    <TextBlock x:Name="LangLabel"
-                               Text="EN → KO"
-                               FontSize="14"
-                               FontFamily="{StaticResource AppUIFont}"
-                               Foreground="#70FFFFFF"
-                               VerticalAlignment="Center" />
                     <TextBlock Text="  ·  Tab: 모드 전환"
                                FontSize="13"
                                FontFamily="{StaticResource AppUIFont}"

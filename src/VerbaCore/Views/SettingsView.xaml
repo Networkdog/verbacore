@@ -91,6 +91,44 @@
             </StackPanel>
 
             <!-- Input Settings -->
+            <TextBlock Text="언어 설정" FontSize="16" FontWeight="SemiBold" Margin="0,16,0,12" />
+
+            <ui:Card Margin="0,0,0,8">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                        <TextBlock Text="모국어" FontSize="13" />
+                        <TextBlock Text="해설과 번역 결과가 표시되는 언어" FontSize="10" Opacity="0.5" />
+                    </StackPanel>
+                    <ComboBox Grid.Column="1"
+                              ItemsSource="{Binding AvailableLanguages}"
+                              SelectedItem="{Binding NativeLanguage}"
+                              IsEditable="True"
+                              MinWidth="130" />
+                </Grid>
+            </ui:Card>
+
+            <ui:Card Margin="0,0,0,8">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                        <TextBlock Text="외국어" FontSize="13" />
+                        <TextBlock Text="주로 학습하거나 번역할 대상 언어" FontSize="10" Opacity="0.5" />
+                    </StackPanel>
+                    <ComboBox Grid.Column="1"
+                              ItemsSource="{Binding AvailableLanguages}"
+                              SelectedItem="{Binding ForeignLanguage}"
+                              IsEditable="True"
+                              MinWidth="130" />
+                </Grid>
+            </ui:Card>
+
             <TextBlock Text="입력 설정" FontSize="16" FontWeight="SemiBold" Margin="0,16,0,12" />
 
             <ui:Card Margin="0,0,0,8">

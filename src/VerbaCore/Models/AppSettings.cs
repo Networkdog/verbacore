@@ -16,8 +16,8 @@ public sealed class AppSettings
     // Custom/OpenAI-compatible endpoint (for OpenRouter, local LLMs, etc.)
     public string CustomEndpoint { get; set; } = string.Empty;
 
-    public string SourceLanguage { get; set; } = "English";
-    public string TargetLanguage { get; set; } = "Korean";
+    public string NativeLanguage { get; set; } = "Korean";
+    public string ForeignLanguage { get; set; } = "English";
     public string GlobalHotkey { get; set; } = "Ctrl+Alt+V";
     public bool StartWithWindows { get; set; } = false;
     public ThemeMode Theme { get; set; } = ThemeMode.System;
