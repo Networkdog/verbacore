@@ -59,9 +59,6 @@ public partial class SettingsViewModel : ObservableObject
     private string _azureEndpoint = string.Empty;
 
     [ObservableProperty]
-    private string _azureDeploymentName = string.Empty;
-
-    [ObservableProperty]
     private string _azureApiVersion = "2024-10-21";
 
     [ObservableProperty]
@@ -155,7 +152,6 @@ public partial class SettingsViewModel : ObservableObject
         SelectedModel = s.Model;
         ReasoningEffort = s.ReasoningEffort;
         AzureEndpoint = s.AzureEndpoint;
-        AzureDeploymentName = s.AzureDeploymentName;
         AzureApiVersion = s.AzureApiVersion;
         CustomEndpoint = s.CustomEndpoint;
         StartWithWindows = s.StartWithWindows;
@@ -222,7 +218,6 @@ public partial class SettingsViewModel : ObservableObject
         s.Model = SelectedModel;
         s.ReasoningEffort = ReasoningEffort;
         s.AzureEndpoint = AzureEndpoint;
-        s.AzureDeploymentName = AzureDeploymentName;
         s.AzureApiVersion = AzureApiVersion;
         s.CustomEndpoint = CustomEndpoint;
         s.StartWithWindows = StartWithWindows;

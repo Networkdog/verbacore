@@ -9,7 +9,13 @@
              mc:Ignorable="d"
              Background="Transparent">
 
-    <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="16,8,16,16">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+    <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto" Padding="16,8,16,16">
         <StackPanel Margin="0,0,0,16">
 
             <!-- API Settings -->
@@ -33,12 +39,34 @@
 
             <ui:Card Margin="0,0,0,8">
                 <StackPanel>
-                    <TextBlock Text="모델" Margin="0,0,0,4" FontSize="12" Opacity="0.7" />
+                    <TextBlock Margin="0,0,0,4" FontSize="12" Opacity="0.7">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Text" Value="모델" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsAzure}" Value="True">
+                                        <Setter Property="Text" Value="모델 (Deployment Name)" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
                     <ComboBox ItemsSource="{Binding AvailableModels}"
                               SelectedItem="{Binding SelectedModel}"
                               IsEditable="True"
                               Text="{Binding SelectedModel, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                    <TextBlock Text="목록에서 선택하거나 직접 입력할 수 있습니다" FontSize="10" Opacity="0.5" Margin="0,4,0,0" />
+                    <TextBlock FontSize="10" Opacity="0.5" Margin="0,4,0,0">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Text" Value="목록에서 선택하거나 직접 입력할 수 있습니다" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsAzure}" Value="True">
+                                        <Setter Property="Text" Value="Azure OpenAI의 배포 이름을 입력하세요" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
                 </StackPanel>
             </ui:Card>
 
@@ -217,20 +245,27 @@
                 </Grid>
             </ui:Card>
 
-            <!-- Save Button -->
-            <ui:Button Content="설정 저장"
-                       Appearance="Primary"
-                       Command="{Binding SaveSettingsCommand}"
-                       HorizontalAlignment="Stretch"
-                       FontSize="14"
-                       Padding="0,10"
-                       Margin="0,16,0,0" />
-
-            <TextBlock Text="{Binding StatusMessage}"
-                       FontSize="12"
-                       Foreground="Green"
-                       HorizontalAlignment="Center"
-                       Margin="0,8,0,0" />
         </StackPanel>
     </ScrollViewer>
+
+        <!-- Sticky Save Button -->
+        <Border Grid.Row="1" Padding="16,8,16,12"
+                BorderThickness="0,1,0,0"
+                BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}">
+            <StackPanel>
+                <ui:Button Content="설정 저장"
+                           Appearance="Primary"
+                           Command="{Binding SaveSettingsCommand}"
+                           HorizontalAlignment="Stretch"
+                           FontSize="14"
+                           Padding="0,10" />
+
+                <TextBlock Text="{Binding StatusMessage}"
+                           FontSize="12"
+                           Foreground="Green"
+                           HorizontalAlignment="Center"
+                           Margin="0,6,0,0" />
+            </StackPanel>
+        </Border>
+    </Grid>
 </UserControl>

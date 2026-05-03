@@ -52,11 +52,7 @@ public sealed partial class OpenAiService : IOpenAiService
 
     private static string BuildAzureUrl(AppSettings s)
     {
-        // Use AzureDeploymentName if set, otherwise fall back to Model
-        var deployment = !string.IsNullOrWhiteSpace(s.AzureDeploymentName)
-            ? s.AzureDeploymentName
-            : s.Model;
-        return $"{s.AzureEndpoint.TrimEnd('/')}/openai/deployments/{deployment}/chat/completions?api-version={s.AzureApiVersion}";
+        return $"{s.AzureEndpoint.TrimEnd('/')}/openai/deployments/{s.Model}/chat/completions?api-version={s.AzureApiVersion}";
     }
 
     private static string BuildCustomUrl(string endpoint)

@@ -8,7 +8,7 @@ VerbaCore is a lightweight Windows desktop AI dictionary & translation app. It l
 - **UI**: WPF + WPF-UI 3.x (SettingsPanel) / raw WPF (Overlay)
 - **Architecture**: MVVM (CommunityToolkit.Mvvm) — settings; code-behind — overlay
 - **DI**: Microsoft.Extensions.DependencyInjection
-- **AI**: HttpClient SSE streaming (6 providers: OpenAI, AzureOpenAI, Anthropic, Google, OpenRouter, Custom)
+- **AI**: HttpClient SSE streaming (6 providers: OpenAI, AzureOpenAI, Anthropic, Google, OpenRouter, Custom) — Model field doubles as Azure Deployment Name
 - **Input**: CapsLock quasimodal keyboard hook (WH_KEYBOARD_LL)
 - **Tray**: System.Windows.Forms.NotifyIcon
 - **Settings**: JSON + DPAPI encryption (`%AppData%\VerbaCore\settings.json`)

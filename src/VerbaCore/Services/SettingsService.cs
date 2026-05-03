@@ -66,7 +66,6 @@ public sealed class SettingsService
             Model = _current.Model,
             ReasoningEffort = _current.ReasoningEffort,
             AzureEndpoint = _current.AzureEndpoint,
-            AzureDeploymentName = _current.AzureDeploymentName,
             AzureApiVersion = _current.AzureApiVersion,
             CustomEndpoint = _current.CustomEndpoint,
             NativeLanguage = _current.NativeLanguage,

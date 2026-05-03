@@ -10,7 +10,6 @@ public sealed class AppSettings
 
     // Azure OpenAI specific
     public string AzureEndpoint { get; set; } = string.Empty;
-    public string AzureDeploymentName { get; set; } = string.Empty;
     public string AzureApiVersion { get; set; } = "2024-10-21";
 
     // Custom/OpenAI-compatible endpoint (for OpenRouter, local LLMs, etc.)

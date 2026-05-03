@@ -43,31 +43,12 @@
             <Grid Margin="32,24">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
-                <!-- Mode indicator -->
-                <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,16">
-                    <Border Background="#20FFFFFF" CornerRadius="8" Padding="10,4">
-                        <TextBlock x:Name="ModeLabel"
-                                   Text="📖 사전"
-                                   FontSize="14"
-                                   FontFamily="{StaticResource AppUIFont}"
-                                   Foreground="#B0FFFFFF"
-                                   VerticalAlignment="Center" />
-                    </Border>
-                    <TextBlock Text="  ·  Tab: 모드 전환"
-                               FontSize="13"
-                               FontFamily="{StaticResource AppUIFont}"
-                               Foreground="#35FFFFFF"
-                               VerticalAlignment="Center"
-                               x:Name="HintLabel" />
-                </StackPanel>
-
                 <!-- Input text (large, Enso-style) - for long-press mode -->
-                <TextBlock Grid.Row="1"
+                <TextBlock Grid.Row="0"
                            x:Name="InputDisplay"
                            Text=""
                            FontSize="72"
@@ -80,7 +61,7 @@
                            Margin="0,0,0,8" />
 
                 <!-- IME-enabled input for persistent (quick-tap) mode - supports Korean -->
-                <TextBox Grid.Row="1"
+                <TextBox Grid.Row="0"
                          x:Name="InputTextBox"
                          FontSize="64"
                          FontWeight="Light"
@@ -114,7 +95,7 @@
                 </TextBox>
 
                 <!-- Blinking cursor (Enso mode only) -->
-                <Border Grid.Row="1"
+                <Border Grid.Row="0"
                         x:Name="BlinkingCursor"
                         Width="3" Height="80"
                         Background="White"
@@ -124,7 +105,7 @@
                         Opacity="0.8" />
 
                 <!-- Result area (appears after CapsLock release) -->
-                <FlowDocumentScrollViewer Grid.Row="2"
+                <FlowDocumentScrollViewer Grid.Row="1"
                               x:Name="ResultViewer"
                               VerticalScrollBarVisibility="Auto"
                               HorizontalScrollBarVisibility="Disabled"
@@ -139,7 +120,7 @@
                               IsToolBarVisible="False" />
 
                 <!-- Loading indicator -->
-                <StackPanel Grid.Row="2"
+                <StackPanel Grid.Row="1"
                             x:Name="LoadingPanel"
                             Visibility="Collapsed"
                             HorizontalAlignment="Center"
@@ -184,15 +165,39 @@
                                Margin="0,10,0,0" />
                 </StackPanel>
 
-                <!-- Status -->
-                <TextBlock Grid.Row="3"
-                           x:Name="StatusLabel"
-                           Text="CapsLock을 누른 채로 단어를 입력하세요"
-                           FontSize="13"
-                           FontFamily="{StaticResource AppUIFont}"
-                           Foreground="#40FFFFFF"
-                           HorizontalAlignment="Center"
-                           Margin="0,10,0,0" />
+                <!-- Mode indicator + Status (same row) -->
+                <Grid Grid.Row="2" Margin="0,12,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                        <Border Background="#20FFFFFF" CornerRadius="8" Padding="10,4">
+                            <TextBlock x:Name="ModeLabel"
+                                       Text="📖 사전"
+                                       FontSize="14"
+                                       FontFamily="{StaticResource AppUIFont}"
+                                       Foreground="#B0FFFFFF"
+                                       VerticalAlignment="Center" />
+                        </Border>
+                        <TextBlock Text="  ·  Tab: 모드 전환"
+                                   FontSize="13"
+                                   FontFamily="{StaticResource AppUIFont}"
+                                   Foreground="#35FFFFFF"
+                                   VerticalAlignment="Center"
+                                   x:Name="HintLabel" />
+                    </StackPanel>
+
+                    <TextBlock Grid.Column="1"
+                               x:Name="StatusLabel"
+                               Text="CapsLock을 누른 채로 단어를 입력하세요"
+                               FontSize="13"
+                               FontFamily="{StaticResource AppUIFont}"
+                               Foreground="#40FFFFFF"
+                               HorizontalAlignment="Right"
+                               VerticalAlignment="Center" />
+                </Grid>
             </Grid>
             </Border>
         </Border>
