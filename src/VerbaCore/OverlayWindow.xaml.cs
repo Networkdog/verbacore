@@ -61,8 +61,8 @@ public partial class OverlayWindow : Window
     private Storyboard? _cursorBlinkStoryboard;
     private static readonly SolidColorBrush WhiteBrush = CreateFrozenBrush(0xFF, 0xFF, 0xFF, 0xFF);
     private static readonly SolidColorBrush ItalicBrush = CreateFrozenBrush(0xD0, 0xCC, 0xDD, 0xFF);
-    private static readonly SolidColorBrush CodeFgBrush = CreateFrozenBrush(0xFF, 0xA0, 0xE0, 0xFF);
-    private static readonly SolidColorBrush CodeBgBrush = CreateFrozenBrush(0x30, 0xFF, 0xFF, 0xFF);
+    private static readonly SolidColorBrush CodeFgBrush = CreateFrozenBrush(0xFF, 0xF0, 0xF4, 0xFF);
+    private static readonly SolidColorBrush CodeBgBrush = CreateFrozenBrush(0x55, 0xFF, 0xFF, 0xFF);
     private static readonly SolidColorBrush CompactInputBrush = CreateFrozenBrush(0x90, 0xFF, 0xFF, 0xFF);
     private static readonly SolidColorBrush HeadingBrush = CreateFrozenBrush(0xFF, 0x60, 0xCD, 0xFF);
     private static readonly SolidColorBrush HeadingSubBrush = CreateFrozenBrush(0xFF, 0x90, 0xD0, 0xF0);
@@ -464,32 +464,16 @@ public partial class OverlayWindow : Window
     }
 
     /// <summary>
-    /// When lookup begins, shrinks the input area to a compact single-line summary
-    /// with ellipsis so that the result area gets maximum space.
+    /// When lookup begins, hides the input area entirely so the result area gets
+    /// maximum space. (Previously showed a truncated single-line summary with
+    /// ellipsis, but the original text is already echoed in the result for
+    /// Translate mode and is unnecessary for Dictionary/Assist modes.)
     /// </summary>
     private void CompactInputDisplay(string input)
     {
-        const int maxDisplayChars = 50;
-        var displayText = input.Length > maxDisplayChars
-            ? string.Concat(input.AsSpan(0, maxDisplayChars), "…")
-            : input;
-
-        var sizeScale = _settingsService.Current.OverlaySize switch
-        {
-            OverlaySize.Small => 0.75,
-            OverlaySize.Large => 1.15,
-            _ => 1.0,
-        };
-
-        InputDisplay.Text = displayText;
-        InputDisplay.FontSize = 18 * sizeScale;
-        InputDisplay.FontWeight = FontWeights.Normal;
-        InputDisplay.Foreground = CompactInputBrush;
-        InputDisplay.TextWrapping = TextWrapping.NoWrap;
-        InputDisplay.TextTrimming = TextTrimming.CharacterEllipsis;
-        InputDisplay.MaxHeight = 30 * sizeScale;
-        InputDisplay.Visibility = Visibility.Visible;
-
+        _ = input;
+        InputDisplay.Text = string.Empty;
+        InputDisplay.Visibility = Visibility.Collapsed;
         InputTextBox.Visibility = Visibility.Collapsed;
         BlinkingCursor.Visibility = Visibility.Collapsed;
     }
@@ -719,29 +703,18 @@ public partial class OverlayWindow : Window
     private void ShowOverlay()
     {
         var workArea = SystemParameters.WorkArea;
-        var dpiScale = GetDpiScale();
-        var textLength = (_grabbedSelectedText ?? "").Length;
 
-        // Base sizes per OverlaySize setting (in DIPs)
+        // Window size strictly follows the OverlaySize setting; do not auto-expand by mode/text length.
         var sizePreset = _settingsService.Current.OverlaySize;
-        var (baseW, baseH, longW, longH) = sizePreset switch
+        var (baseW, baseH) = sizePreset switch
         {
-            OverlaySize.Small  => (540.0, 440.0, 680.0, 560.0),
-            OverlaySize.Large  => (900.0, 740.0, 1100.0, 900.0),
-            _                  => (700.0, 600.0, 900.0, 750.0), // Medium
+            OverlaySize.Small  => (540.0, 440.0),
+            OverlaySize.Large  => (900.0, 740.0),
+            _                  => (700.0, 600.0), // Medium
         };
 
-        // Expand overlay for longer text (e.g. grabbed paragraphs, translation input)
-        if (textLength > 100)
-        {
-            Width = Math.Min(longW, workArea.Width * 0.65);
-            Height = Math.Min(longH, workArea.Height * 0.85);
-        }
-        else
-        {
-            Width = Math.Min(baseW, workArea.Width * 0.5);
-            Height = Math.Min(baseH, workArea.Height * 0.7);
-        }
+        Width = Math.Min(baseW, workArea.Width * 0.9);
+        Height = Math.Min(baseH, workArea.Height * 0.9);
 
         var pos = _settingsService.Current.PopupPosition;
         var margin = 20.0;

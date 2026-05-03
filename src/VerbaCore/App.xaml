@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
              xmlns:helpers="clr-namespace:VerbaCore.Helpers"
+             xmlns:markdig="clr-namespace:Markdig.Wpf;assembly=Markdig.Wpf"
              ShutdownMode="OnExplicitShutdown"
              DispatcherUnhandledException="OnDispatcherUnhandledException">
     <Application.Resources>
@@ -24,6 +25,21 @@
             <FontFamily x:Key="AppUIFont">Noto Sans KR, AppleSDGothicNeoL00, Segoe UI</FontFamily>
             <FontFamily x:Key="AppContentFont">Noto Sans Light, AppleSDGothicNeoL00, Segoe UI</FontFamily>
             <FontFamily x:Key="AppCodeFont">Cascadia Code, Consolas, monospace</FontFamily>
+
+            <!-- Override Markdig.Wpf code styles: remove light gray background that
+                 makes white text unreadable on the dark overlay. -->
+            <Style x:Key="{x:Static markdig:Styles.CodeStyleKey}" TargetType="{x:Type Span}">
+                <Setter Property="FontFamily" Value="{StaticResource AppCodeFont}" />
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="Foreground" Value="#FFE6B85C" />
+            </Style>
+
+            <Style x:Key="{x:Static markdig:Styles.CodeBlockStyleKey}" TargetType="{x:Type Paragraph}">
+                <Setter Property="FontFamily" Value="{StaticResource AppCodeFont}" />
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="Foreground" Value="#FFE6B85C" />
+                <Setter Property="Margin" Value="0,4,0,4" />
+            </Style>
         </ResourceDictionary>
     </Application.Resources>
 </Application>

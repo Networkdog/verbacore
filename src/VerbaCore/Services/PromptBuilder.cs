@@ -187,22 +187,39 @@ public sealed partial class PromptBuilder
 
     private static string BuildTranslatePrompt(string text, string nativeLanguage, string foreignLanguage)
     {
-        return $"""
+        return $$"""
             [Rules]
-            - The user's native language is {nativeLanguage}. Their primary foreign language is {foreignLanguage}.
+            - The user's native language is {{nativeLanguage}}. Their primary foreign language is {{foreignLanguage}}.
             - Auto-detect the input language and apply:
-              • If input is in {foreignLanguage} → translate to {nativeLanguage}.
-              • If input is in {nativeLanguage} → translate to {foreignLanguage}.
-              • If input is in a THIRD language → translate to {nativeLanguage}.
+              • If input is in {{foreignLanguage}} → translate to {{nativeLanguage}}.
+              • If input is in {{nativeLanguage}} → translate to {{foreignLanguage}}.
+              • If input is in a THIRD language → translate to {{nativeLanguage}}.
             - Use rich markdown formatting in your response.
 
+            [Paragraph Handling — CRITICAL]
+            - Split the input into paragraphs. A paragraph break is one or more blank lines, OR a hard line break that visually separates a logical block.
+            - For EACH paragraph, output the original paragraph FIRST (verbatim, no omissions, no summarization), then the translated paragraph immediately after.
+            - Repeat for every paragraph in order. Do NOT batch all originals first or all translations first.
+            - If the input is a single paragraph, output the original once followed by the translation once.
+            - Preserve the original text EXACTLY — every word, punctuation mark, and line break inside a paragraph must be retained.
+
             [Input Text]
-            "{text}"
+            "{{text}}"
 
             [Output Format]
-            (the translation text directly — do NOT include any heading like "번역" or "Translation")
+            For each paragraph i (1, 2, 3, ...), output the following block, separated from the next block by a horizontal rule (---):
 
-            > 💡 **참고**: (brief notes on nuances, formality level, or alternative translations if applicable, written in {nativeLanguage})
+            {original paragraph i — verbatim, no changes}
+
+            ```
+            {translated paragraph i}
+            ```
+            
+            After all paragraph blocks, optionally append:
+
+            > 💡 **참고**: (brief notes on nuances, formality level, or alternative translations if applicable, written in {{nativeLanguage}})
+
+            Do NOT include any heading like "번역", "Translation", "원본", or "Original" — the blockquote vs. plain-text distinction is sufficient.
             """;
     }
 
