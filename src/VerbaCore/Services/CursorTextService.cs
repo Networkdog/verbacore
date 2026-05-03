@@ -21,21 +21,42 @@ public sealed class CursorTextService
     {
         try
         {
-            var focused = _uia.GetFocusedElement();
-            if (focused == null) return null;
+            // 1) Pre-warm the foreground app's accessibility tree.
+            //    For Electron/Chromium this triggers lazy a11y initialization
+            //    (the same mechanism NVDA uses). Without this call, Chromium
+            //    apps return null even though the user has text selected.
+            IUIAutomationElement? hwndRoot = null;
+            try
+            {
+                var fgHwnd = NativeMethods.GetForegroundWindow();
+                if (fgHwnd != IntPtr.Zero)
+                    hwndRoot = _uia.ElementFromHandle(fgHwnd);
+            }
+            catch (COMException) { /* tolerate */ }
 
-            // Try TextPattern on the focused element
-            var text = TryGetSelectionText(focused);
+            // 2) Fast path: focused element + its ancestors.
+            var text = TryFocusedAndAncestors();
             if (text != null) return text;
 
-            // Walk up the UIA tree — Chromium exposes TextPattern on Document/Pane parent
-            var walker = _uia.RawViewWalker;
-            var parent = walker.GetParentElement(focused);
-            for (var depth = 0; parent != null && depth < 8; depth++)
+            // 3) Chromium often exposes TextPattern on a Document descendant of
+            //    the window root rather than an ancestor of the focused element.
+            //    Search the window root's subtree for any element with a non-empty
+            //    selection.
+            if (hwndRoot != null)
             {
-                text = TryGetSelectionText(parent);
+                text = SearchDescendants(hwndRoot, depth: 0, maxDepth: 8, siblingBudget: 64);
                 if (text != null) return text;
-                parent = walker.GetParentElement(parent);
+            }
+
+            // 4) On the first activation Chromium builds the a11y tree async.
+            //    A single short retry catches that race without noticeable lag.
+            Thread.Sleep(60);
+            text = TryFocusedAndAncestors();
+            if (text != null) return text;
+            if (hwndRoot != null)
+            {
+                text = SearchDescendants(hwndRoot, depth: 0, maxDepth: 10, siblingBudget: 96);
+                if (text != null) return text;
             }
 
             return null;
@@ -48,6 +69,59 @@ public sealed class CursorTextService
         {
             return null;
         }
+    }
+
+    private string? TryFocusedAndAncestors()
+    {
+        try
+        {
+            var focused = _uia.GetFocusedElement();
+            if (focused == null) return null;
+
+            var text = TryGetSelectionText(focused);
+            if (text != null) return text;
+
+            var walker = _uia.RawViewWalker;
+            var parent = walker.GetParentElement(focused);
+            for (var depth = 0; parent != null && depth < 8; depth++)
+            {
+                text = TryGetSelectionText(parent);
+                if (text != null) return text;
+                parent = walker.GetParentElement(parent);
+            }
+            return null;
+        }
+        catch (COMException) { return null; }
+        catch (InvalidOperationException) { return null; }
+    }
+
+    /// <summary>
+    /// Bounded DFS over the UIA subtree looking for an element whose TextPattern
+    /// reports a non-empty selection. Used as a fallback for Chromium/Electron
+    /// where the document node isn't an ancestor of the focused element.
+    /// </summary>
+    private string? SearchDescendants(IUIAutomationElement element, int depth, int maxDepth, int siblingBudget)
+    {
+        try
+        {
+            var t = TryGetSelectionText(element);
+            if (t != null) return t;
+            if (depth >= maxDepth) return null;
+
+            var walker = _uia.RawViewWalker;
+            var child = walker.GetFirstChildElement(element);
+            var visited = 0;
+            while (child != null && visited < siblingBudget)
+            {
+                var r = SearchDescendants(child, depth + 1, maxDepth, siblingBudget);
+                if (r != null) return r;
+                child = walker.GetNextSiblingElement(child);
+                visited++;
+            }
+            return null;
+        }
+        catch (COMException) { return null; }
+        catch (InvalidOperationException) { return null; }
     }
 
     private static string? TryGetSelectionText(IUIAutomationElement element)
