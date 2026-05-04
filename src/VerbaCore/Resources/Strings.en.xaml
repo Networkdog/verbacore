@@ -98,6 +98,7 @@ Please check your API Key and settings.</sys:String>
 
     <!-- Tray -->
     <sys:String x:Key="Tray_Settings">⚙ Settings</sys:String>
+    <sys:String x:Key="Tray_CheckUpdate">Check for updates</sys:String>
     <sys:String x:Key="Tray_About">About VerbaCore</sys:String>
     <sys:String x:Key="Tray_Exit">Exit</sys:String>
     <sys:String x:Key="Tray_Tooltip">VerbaCore — AI Dictionary/Translator via CapsLock</sys:String>
@@ -114,5 +115,21 @@ Backspace: Delete character</sys:String>
     <!-- Azure key placeholder -->
     <sys:String x:Key="AzureKeyPlaceholder_True">Azure API Key</sys:String>
     <sys:String x:Key="AzureKeyPlaceholder_False">sk-...</sys:String>
+
+    <!-- Update -->
+    <sys:String x:Key="Settings_UpdateSection">Update</sys:String>
+    <sys:String x:Key="Settings_CurrentVersion">Current version:</sys:String>
+    <sys:String x:Key="Settings_AutoCheckUpdate">Check for updates automatically</sys:String>
+    <sys:String x:Key="Settings_AutoCheckUpdateHint">Quietly check once a day and notify you when a new version is available</sys:String>
+    <sys:String x:Key="Settings_CheckUpdateButton">Check now</sys:String>
+    <sys:String x:Key="Update_Checking">Checking for updates...</sys:String>
+    <sys:String x:Key="Update_Available">A new version of VerbaCore is available.
+
+New: {0}
+Current: {1}
+
+Download and install now?</sys:String>
+    <sys:String x:Key="Update_UpToDate">You are running the latest version of VerbaCore.</sys:String>
+    <sys:String x:Key="Update_Failed">Update check failed. Please try again later.</sys:String>
 
 </ResourceDictionary>

@@ -63,6 +63,30 @@ jobs:
         run: |
           Compress-Archive -Path publish-standalone/* -DestinationPath "VerbaCore-${{ steps.version.outputs.VERSION }}-portable.zip"
 
+      - name: Generate latest.json (auto-update manifest)
+        shell: pwsh
+        run: |
+          $version = "${{ steps.version.outputs.VERSION }}"
+          $tag = "${{ steps.version.outputs.TAG }}"
+          $installer = "installer-output/VerbaCore-Setup-$version.exe"
+          if (-not (Test-Path $installer)) {
+            Write-Error "Installer not found at $installer"
+            exit 1
+          }
+          $sha = (Get-FileHash -Path $installer -Algorithm SHA256).Hash.ToLower()
+          $url = "https://github.com/${{ github.repository }}/releases/download/$tag/VerbaCore-Setup-$version.exe"
+          $date = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+          $manifest = [ordered]@{
+            version      = $version
+            url          = $url
+            sha256       = $sha
+            releaseDate  = $date
+            releaseNotes = ""
+            mandatory    = $false
+          }
+          ($manifest | ConvertTo-Json -Depth 4) | Set-Content -Path latest.json -Encoding UTF8
+          Get-Content latest.json
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -74,3 +98,4 @@ jobs:
           files: |
             installer-output/VerbaCore-Setup-${{ steps.version.outputs.VERSION }}.exe
             VerbaCore-${{ steps.version.outputs.VERSION }}-portable.zip
+            latest.json

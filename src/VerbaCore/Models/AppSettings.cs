@@ -25,6 +25,11 @@ public sealed class AppSettings
     public double WindowHeight { get; set; } = 680;
     public OverlayPosition PopupPosition { get; set; } = OverlayPosition.CenterCenter;
     public OverlaySize OverlaySize { get; set; } = OverlaySize.Medium;
+
+    // Auto-update
+    public bool AutoCheckUpdate { get; set; } = true;
+    public DateTime LastUpdateCheckUtc { get; set; } = DateTime.MinValue;
+    public string SkippedUpdateVersion { get; set; } = string.Empty;
 }
 
 public enum ApiProvider

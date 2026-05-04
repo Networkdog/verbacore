@@ -3,11 +3,16 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
              xmlns:vm="clr-namespace:VerbaCore.ViewModels"
+             xmlns:helpers="clr-namespace:VerbaCore.Helpers"
              d:DataContext="{d:DesignInstance vm:SettingsViewModel}"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d"
              Background="Transparent">
+
+    <UserControl.Resources>
+        <helpers:InverseBoolConverter x:Key="InverseBoolConverter" />
+    </UserControl.Resources>
 
     <Grid>
         <Grid.RowDefinitions>
@@ -248,6 +253,44 @@
                     <ui:ToggleSwitch Grid.Column="1"
                                      IsChecked="{Binding StartWithWindows}" />
                 </Grid>
+            </ui:Card>
+
+            <!-- Update -->
+            <TextBlock Text="{DynamicResource Settings_UpdateSection}" FontSize="16" FontWeight="SemiBold" Margin="0,16,0,12" />
+
+            <ui:Card Margin="0,0,0,8">
+                <StackPanel>
+                    <Grid Margin="0,0,0,12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                            <TextBlock Text="{DynamicResource Settings_AutoCheckUpdate}" FontSize="13" />
+                            <TextBlock Text="{DynamicResource Settings_AutoCheckUpdateHint}" FontSize="11" Opacity="0.6" />
+                        </StackPanel>
+                        <ui:ToggleSwitch Grid.Column="1"
+                                         IsChecked="{Binding AutoCheckUpdate}" />
+                    </Grid>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0"
+                                   VerticalAlignment="Center"
+                                   FontSize="12"
+                                   Opacity="0.7">
+                            <Run Text="{DynamicResource Settings_CurrentVersion}" />
+                            <Run Text=" " />
+                            <Run Text="{Binding CurrentVersion, Mode=OneWay}" FontWeight="SemiBold" />
+                        </TextBlock>
+                        <ui:Button Grid.Column="1"
+                                   Content="{DynamicResource Settings_CheckUpdateButton}"
+                                   Command="{Binding CheckForUpdatesCommand}"
+                                   IsEnabled="{Binding IsCheckingUpdate, Converter={StaticResource InverseBoolConverter}}" />
+                    </Grid>
+                </StackPanel>
             </ui:Card>
 
         </StackPanel>

@@ -98,6 +98,7 @@ API Key와 설정을 확인해주세요.</sys:String>
 
     <!-- Tray -->
     <sys:String x:Key="Tray_Settings">⚙ 설정</sys:String>
+    <sys:String x:Key="Tray_CheckUpdate">업데이트 확인</sys:String>
     <sys:String x:Key="Tray_About">VerbaCore 정보</sys:String>
     <sys:String x:Key="Tray_Exit">종료</sys:String>
     <sys:String x:Key="Tray_Tooltip">VerbaCore — CapsLock으로 AI 사전/번역</sys:String>
@@ -114,5 +115,21 @@ Backspace: 글자 삭제</sys:String>
     <!-- Azure key placeholder -->
     <sys:String x:Key="AzureKeyPlaceholder_True">Azure API Key</sys:String>
     <sys:String x:Key="AzureKeyPlaceholder_False">sk-...</sys:String>
+
+    <!-- Update -->
+    <sys:String x:Key="Settings_UpdateSection">업데이트</sys:String>
+    <sys:String x:Key="Settings_CurrentVersion">현재 버전:</sys:String>
+    <sys:String x:Key="Settings_AutoCheckUpdate">업데이트 자동 확인</sys:String>
+    <sys:String x:Key="Settings_AutoCheckUpdateHint">하루 한 번 조용히 확인하고 새 버전이 있으면 알려줍니다</sys:String>
+    <sys:String x:Key="Settings_CheckUpdateButton">지금 확인</sys:String>
+    <sys:String x:Key="Update_Checking">업데이트 확인 중...</sys:String>
+    <sys:String x:Key="Update_Available">VerbaCore 새 버전이 있습니다.
+
+새 버전: {0}
+현재 버전: {1}
+
+지금 다운로드하고 설치하시겠습니까?</sys:String>
+    <sys:String x:Key="Update_UpToDate">최신 버전을 사용 중입니다.</sys:String>
+    <sys:String x:Key="Update_Failed">업데이트 확인에 실패했습니다. 잠시 후 다시 시도해 주세요.</sys:String>
 
 </ResourceDictionary>

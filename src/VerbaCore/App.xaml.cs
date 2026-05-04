@@ -34,6 +34,12 @@ public partial class App : Application
         services.AddSingleton<CapsLockService>();
         services.AddSingleton<CursorTextService>();
         services.AddSingleton<HotkeyService>();
+
+        // Dedicated HttpClient for update checks (separate from OpenAiService's client).
+        services.AddSingleton<System.Net.Http.HttpClient>(_ =>
+            new System.Net.Http.HttpClient { Timeout = TimeSpan.FromSeconds(30) });
+        services.AddSingleton<UpdateService>();
+
         services.AddSingleton<IOpenAiService>(sp =>
         {
             var handler = new System.Net.Http.HttpClientHandler
@@ -118,6 +124,88 @@ public partial class App : Application
 
         // Set up system tray icon
         SetupTrayIcon();
+
+        // Background auto-update check (fire-and-forget). Throttled to once per 24h.
+        if (settings.Current.AutoCheckUpdate)
+        {
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(5)).ConfigureAwait(false);
+                    if (DateTime.UtcNow - settings.Current.LastUpdateCheckUtc < TimeSpan.FromHours(24))
+                        return;
+                    await Dispatcher.InvokeAsync(() => CheckForUpdatesAsync(silentIfNone: true));
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[VerbaCore] Auto-update check failed: {ex.Message}");
+                }
+            });
+        }
+    }
+
+    /// <summary>
+    /// Check for updates and, if one is available, prompt the user to download & install.
+    /// When <paramref name="silentIfNone"/> is true, no message is shown when up-to-date or on error.
+    /// </summary>
+    public async Task CheckForUpdatesAsync(bool silentIfNone)
+    {
+        var loc = GetService<LocalizationService>();
+        var settings = GetService<SettingsService>();
+        var updater = GetService<UpdateService>();
+
+        var (info, available) = await updater.CheckAsync(CancellationToken.None);
+
+        if (info is null)
+        {
+            if (!silentIfNone)
+                MessageBox.Show(loc.Get("Update_Failed"), "VerbaCore",
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        if (!available)
+        {
+            if (!silentIfNone)
+                MessageBox.Show(loc.Get("Update_UpToDate"), "VerbaCore",
+                    MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        // Respect skip preference for auto checks only.
+        if (silentIfNone && info.Version == settings.Current.SkippedUpdateVersion)
+            return;
+
+        var prompt = string.Format(loc.Get("Update_Available"),
+            info.Version, UpdateService.CurrentVersion);
+        if (!string.IsNullOrWhiteSpace(info.ReleaseNotes))
+            prompt += "\n\n" + info.ReleaseNotes;
+
+        var result = MessageBox.Show(prompt, "VerbaCore",
+            MessageBoxButton.YesNo, MessageBoxImage.Question);
+        if (result != MessageBoxResult.Yes)
+        {
+            if (silentIfNone)
+            {
+                settings.Current.SkippedUpdateVersion = info.Version;
+                _ = settings.SaveAsync();
+            }
+            return;
+        }
+
+        try
+        {
+            var path = await updater.DownloadAsync(info, progress: null, CancellationToken.None);
+            UpdateService.LaunchInstaller(path);
+            // Inno Setup with CloseApplications=force will terminate us; shut down gracefully now.
+            ExitApp();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"{loc.Get("Update_Failed")}\n\n{ex.Message}", "VerbaCore",
+                MessageBoxButton.OK, MessageBoxImage.Error);
+        }
     }
 
     private void SetupTrayIcon()
@@ -153,6 +241,8 @@ public partial class App : Application
         _trayContextMenu?.Dispose();
         var contextMenu = new System.Windows.Forms.ContextMenuStrip();
         contextMenu.Items.Add(loc.Get("Tray_Settings"), null, (_, _) => ShowSettingsWindow());
+        contextMenu.Items.Add(loc.Get("Tray_CheckUpdate"), null,
+            async (_, _) => await CheckForUpdatesAsync(silentIfNone: false));
         contextMenu.Items.Add("-");
         contextMenu.Items.Add(loc.Get("Tray_About"), null, (_, _) =>
             MessageBox.Show(

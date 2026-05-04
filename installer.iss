@@ -2,7 +2,7 @@
 ; https://jrsoftware.org/isinfo.php
 
 #define MyAppName "VerbaCore"
-#define MyAppVersion "1.0.0"
+#define MyAppVersion "0.2.0"
 #define MyAppPublisher "Networkdog"
 #define MyAppURL "https://github.com/Networkdog/verbacore"
 #define MyAppExeName "VerbaCore.exe"
@@ -28,6 +28,7 @@ DisableProgramGroupPage=yes
 ArchitecturesInstallIn64BitMode=x64compatible
 CloseApplications=force
 CloseApplicationsFilter={#MyAppExeName}
+RestartApplications=yes
 
 [Languages]
 Name: "korean"; MessagesFile: "compiler:Languages\Korean.isl"

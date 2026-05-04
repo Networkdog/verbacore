@@ -21,3 +21,11 @@ internal partial class SettingsJsonContext : JsonSerializerContext;
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
 [JsonSerializable(typeof(LookupHistory))]
 internal partial class HistoryJsonContext : JsonSerializerContext;
+
+/// <summary>
+/// Source-generated JSON context for the auto-update manifest (latest.json).
+/// </summary>
+[JsonSourceGenerationOptions(
+    PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
+[JsonSerializable(typeof(UpdateInfo))]
+internal partial class UpdateJsonContext : JsonSerializerContext;

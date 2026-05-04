@@ -125,6 +125,14 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     private string _statusMessage = string.Empty;
 
+    [ObservableProperty]
+    private bool _autoCheckUpdate = true;
+
+    [ObservableProperty]
+    private bool _isCheckingUpdate;
+
+    public string CurrentVersion => UpdateService.CurrentVersion;
+
     public ObservableCollection<string> AvailableModels { get; } = new();
     public ObservableCollection<string> AvailablePositions { get; } = new();
     public ObservableCollection<string> AvailableSizes { get; } = new();
@@ -225,6 +233,7 @@ public partial class SettingsViewModel : ObservableObject
             Models.UiLanguage.Japanese => "日本語",
             _ => "한국어"
         };
+        AutoCheckUpdate = s.AutoCheckUpdate;
 
         // Populate localized collections
         AvailablePositions.Clear();
@@ -291,6 +300,7 @@ public partial class SettingsViewModel : ObservableObject
             "日本語" => Models.UiLanguage.Japanese,
             _ => Models.UiLanguage.Korean
         };
+        s.AutoCheckUpdate = AutoCheckUpdate;
 
         await _settingsService.SaveAsync();
 
@@ -318,5 +328,22 @@ public partial class SettingsViewModel : ObservableObject
             StatusMessage = string.Empty;
         }
         catch (OperationCanceledException) { }
+    }
+
+    [RelayCommand]
+    private async Task CheckForUpdatesAsync()
+    {
+        if (IsCheckingUpdate) return;
+        IsCheckingUpdate = true;
+        try
+        {
+            StatusMessage = Loc("Update_Checking");
+            await ((App)Application.Current).CheckForUpdatesAsync(silentIfNone: false);
+            StatusMessage = string.Empty;
+        }
+        finally
+        {
+            IsCheckingUpdate = false;
+        }
     }
 }
