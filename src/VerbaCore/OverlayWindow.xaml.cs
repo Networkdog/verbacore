@@ -22,6 +22,7 @@ public partial class OverlayWindow : Window
     private readonly HistoryService _historyService;
     private readonly CapsLockService _capsLockService;
     private readonly CursorTextService _cursorTextService;
+    private readonly LookupCacheService _cacheService;
 
     private readonly DispatcherTimer _autoHideTimer;
     private CancellationTokenSource? _cts;
@@ -86,13 +87,15 @@ public partial class OverlayWindow : Window
         SettingsService settingsService,
         HistoryService historyService,
         CapsLockService capsLockService,
-        CursorTextService cursorTextService)
+        CursorTextService cursorTextService,
+        LookupCacheService cacheService)
     {
         _openAiService = openAiService;
         _settingsService = settingsService;
         _historyService = historyService;
         _capsLockService = capsLockService;
         _cursorTextService = cursorTextService;
+        _cacheService = cacheService;
 
         InitializeComponent();
 
@@ -572,6 +575,26 @@ public partial class OverlayWindow : Window
         var src = _settingsService.Current.NativeLanguage;
         var tgt = _settingsService.Current.ForeignLanguage;
 
+        // Cache lookup — short-circuit before consuming LLM tokens
+        var cacheKey = LookupCacheService.MakeKey(
+            _settingsService.Current.Provider.ToString(),
+            _settingsService.Current.Model,
+            _currentMode, src, tgt, input);
+        if (_settingsService.Current.EnableLookupCache && _cacheService.TryGet(cacheKey, out var cachedResponse))
+        {
+            StopLoadingSpinner();
+            ShowResultViewer();
+            RenderMarkdown(cachedResponse);
+            StatusLabel.Text = Loc("Overlay_StatusCached");
+            await _historyService.AddAsync(new LookupHistoryItem
+            {
+                Input = input
+            });
+            _autoHideTimer.Start();
+            _isLookupInProgress = false;
+            return;
+        }
+
         try
         {
             var sb = new StringBuilder(1024); // Pre-allocate for typical response size
@@ -602,14 +625,16 @@ public partial class OverlayWindow : Window
 
             StatusLabel.Text = Loc("Overlay_StatusDone");
 
+            // Cache successful response (skip empty)
+            if (_settingsService.Current.EnableLookupCache && sb.Length > 0)
+            {
+                _cacheService.Put(cacheKey, sb.ToString());
+            }
+
             // Save to history
             await _historyService.AddAsync(new LookupHistoryItem
             {
-                Input = input,
-                Mode = _currentMode,
-                Response = sb.ToString(),
-                SourceLanguage = tgt, // ForeignLanguage
-                TargetLanguage = src  // NativeLanguage
+                Input = input
             });
 
             // Auto-hide after delay

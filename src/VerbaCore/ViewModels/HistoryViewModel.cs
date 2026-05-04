@@ -10,7 +10,7 @@ namespace VerbaCore.ViewModels;
 public partial class HistoryViewModel : ObservableObject
 {
     private readonly HistoryService _historyService;
-    private readonly Action<string, LookupMode> _onRequery;
+    private readonly Action<string> _onRequery;
 
     [ObservableProperty]
     private ObservableCollection<LookupHistoryItem> _historyItems = [];
@@ -18,7 +18,7 @@ public partial class HistoryViewModel : ObservableObject
     [ObservableProperty]
     private string _searchFilter = string.Empty;
 
-    public HistoryViewModel(HistoryService historyService, Action<string, LookupMode> onRequery)
+    public HistoryViewModel(HistoryService historyService, Action<string> onRequery)
     {
         _historyService = historyService;
         _onRequery = onRequery;
@@ -40,7 +40,7 @@ public partial class HistoryViewModel : ObservableObject
     private void Requery(LookupHistoryItem? item)
     {
         if (item == null) return;
-        _onRequery(item.Input, item.Mode);
+        _onRequery(item.Input);
     }
 
     [RelayCommand]
@@ -49,14 +49,6 @@ public partial class HistoryViewModel : ObservableObject
         if (item == null) return;
         await _historyService.DeleteAsync(item);
         HistoryItems.Remove(item);
-    }
-
-    [RelayCommand]
-    private static void CopyResult(LookupHistoryItem? item)
-    {
-        if (item == null) return;
-        try { System.Windows.Clipboard.SetText(item.Response); }
-        catch (System.Runtime.InteropServices.ExternalException) { }
     }
 
     [RelayCommand]

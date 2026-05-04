@@ -29,6 +29,7 @@ public partial class App : Application
         // Services
         services.AddSingleton<SettingsService>();
         services.AddSingleton<HistoryService>();
+        services.AddSingleton<LookupCacheService>();
         services.AddSingleton<LocalizationService>();
         services.AddSingleton<PromptBuilder>();
         services.AddSingleton<CapsLockService>();
@@ -63,7 +64,7 @@ public partial class App : Application
         services.AddTransient<HistoryViewModel>(sp =>
         {
             var historyService = sp.GetRequiredService<HistoryService>();
-            return new HistoryViewModel(historyService, (_, _) => { });
+            return new HistoryViewModel(historyService, _ => { });
         });
 
         return services.BuildServiceProvider();
@@ -94,6 +95,9 @@ public partial class App : Application
         var history = GetService<HistoryService>();
         await history.LoadAsync();
 
+        var cache = GetService<LookupCacheService>();
+        await cache.LoadAsync();
+
         // Apply saved settings
         ApplyTheme(settings.Current.Theme);
 
@@ -117,7 +121,8 @@ public partial class App : Application
             settings,
             history,
             _capsLockService,
-            GetService<CursorTextService>());
+            GetService<CursorTextService>(),
+            cache);
 
         // Install CapsLock hook
         _capsLockService.Install();

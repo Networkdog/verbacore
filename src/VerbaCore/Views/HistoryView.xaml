@@ -48,39 +48,17 @@
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
 
-                            <!-- Input & Mode -->
-                            <Grid Grid.Row="0">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0"
-                                           Text="{Binding Input}"
-                                           FontWeight="SemiBold"
-                                           FontSize="13"
-                                           TextTrimming="CharacterEllipsis" />
-                                <TextBlock Grid.Column="1"
-                                           Text="{Binding Mode}"
-                                           FontSize="11"
-                                           Opacity="0.5"
-                                           Margin="8,0,0,0" />
-                            </Grid>
-
-                            <!-- Response preview -->
-                            <TextBlock Grid.Row="1"
-                                       Text="{Binding Response}"
-                                       FontSize="11"
-                                       Opacity="0.7"
-                                       MaxHeight="40"
-                                       TextTrimming="CharacterEllipsis"
-                                       TextWrapping="Wrap"
-                                       Margin="0,4,0,4" />
+                            <!-- Input -->
+                            <TextBlock Grid.Row="0"
+                                       Text="{Binding Input}"
+                                       FontWeight="SemiBold"
+                                       FontSize="13"
+                                       TextTrimming="CharacterEllipsis" />
 
                             <!-- Timestamp & Re-query -->
-                            <Grid Grid.Row="2">
+                            <Grid Grid.Row="1" Margin="0,6,0,0">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
@@ -88,19 +66,13 @@
                                 <TextBlock Grid.Column="0"
                                            Text="{Binding Timestamp, StringFormat='{}{0:yyyy-MM-dd HH:mm}'}"
                                            FontSize="10"
-                                           Opacity="0.4" />
+                                           Opacity="0.4"
+                                           VerticalAlignment="Center" />
                                 <StackPanel Grid.Column="1" Orientation="Horizontal">
                                     <ui:Button Content="{DynamicResource History_Requery}"
                                                FontSize="11"
                                                Padding="8,2"
                                                Command="{Binding DataContext.RequeryCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
-                                               CommandParameter="{Binding}"
-                                               Margin="0,0,4,0" />
-                                    <ui:Button Content="📋"
-                                               FontSize="11"
-                                               Padding="6,2"
-                                               ToolTip="{DynamicResource History_CopyResult}"
-                                               Command="{Binding DataContext.CopyResultCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
                                                CommandParameter="{Binding}"
                                                Margin="0,0,4,0" />
                                     <ui:Button Content="🗑"

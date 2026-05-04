@@ -132,4 +132,12 @@ Backspace: 删除字符</sys:String>
     <sys:String x:Key="Update_UpToDate">您正在使用最新版本。</sys:String>
     <sys:String x:Key="Update_Failed">检查更新失败,请稍后再试。</sys:String>
 
+    <sys:String x:Key="Settings_CacheSection">缓存</sys:String>
+    <sys:String x:Key="Settings_EnableCache">启用查询缓存</sys:String>
+    <sys:String x:Key="Settings_EnableCacheHint">对相同的查询直接使用已保存的结果,避免重复调用 LLM。</sys:String>
+    <sys:String x:Key="Settings_CacheTtlDays">缓存有效期 (天)</sys:String>
+    <sys:String x:Key="Settings_CacheEntryCount">已存储项目:</sys:String>
+    <sys:String x:Key="Settings_ClearCache">清空缓存</sys:String>
+    <sys:String x:Key="Overlay_StatusCached">已从缓存加载</sys:String>
+
 </ResourceDictionary>

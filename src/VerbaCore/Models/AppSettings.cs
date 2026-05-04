@@ -30,6 +30,10 @@ public sealed class AppSettings
     public bool AutoCheckUpdate { get; set; } = true;
     public DateTime LastUpdateCheckUtc { get; set; } = DateTime.MinValue;
     public string SkippedUpdateVersion { get; set; } = string.Empty;
+
+    // Lookup cache
+    public bool EnableLookupCache { get; set; } = true;
+    public int CacheTtlDays { get; set; } = 7;
 }
 
 public enum ApiProvider

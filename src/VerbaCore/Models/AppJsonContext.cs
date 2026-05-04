@@ -29,3 +29,12 @@ internal partial class HistoryJsonContext : JsonSerializerContext;
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
 [JsonSerializable(typeof(UpdateInfo))]
 internal partial class UpdateJsonContext : JsonSerializerContext;
+
+/// <summary>
+/// Source-generated JSON context for LookupCache serialization.
+/// </summary>
+[JsonSourceGenerationOptions(
+    WriteIndented = false,
+    PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
+[JsonSerializable(typeof(LookupCache))]
+internal partial class CacheJsonContext : JsonSerializerContext;

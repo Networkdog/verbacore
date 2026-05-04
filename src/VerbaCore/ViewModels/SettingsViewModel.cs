@@ -11,6 +11,7 @@ public partial class SettingsViewModel : ObservableObject
 {
     private readonly SettingsService _settingsService;
     private readonly LocalizationService _localizationService;
+    private readonly LookupCacheService _cacheService;
 
     private static string Loc(string key) =>
         Application.Current.TryFindResource(key) as string ?? key;
@@ -131,6 +132,15 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     private bool _isCheckingUpdate;
 
+    [ObservableProperty]
+    private bool _enableLookupCache = true;
+
+    [ObservableProperty]
+    private int _cacheTtlDays = 7;
+
+    [ObservableProperty]
+    private int _cacheEntryCount;
+
     public string CurrentVersion => UpdateService.CurrentVersion;
 
     public ObservableCollection<string> AvailableModels { get; } = new();
@@ -148,10 +158,11 @@ public partial class SettingsViewModel : ObservableObject
         "Swedish", "Czech"
     ];
 
-    public SettingsViewModel(SettingsService settingsService, LocalizationService localizationService)
+    public SettingsViewModel(SettingsService settingsService, LocalizationService localizationService, LookupCacheService cacheService)
     {
         _settingsService = settingsService;
         _localizationService = localizationService;
+        _cacheService = cacheService;
         _localizationService.LanguageChanged += OnLanguageChanged;
         LoadFromSettings();
     }
@@ -234,6 +245,9 @@ public partial class SettingsViewModel : ObservableObject
             _ => "한국어"
         };
         AutoCheckUpdate = s.AutoCheckUpdate;
+        EnableLookupCache = s.EnableLookupCache;
+        CacheTtlDays = s.CacheTtlDays;
+        CacheEntryCount = _cacheService.Count;
 
         // Populate localized collections
         AvailablePositions.Clear();
@@ -301,6 +315,8 @@ public partial class SettingsViewModel : ObservableObject
             _ => Models.UiLanguage.Korean
         };
         s.AutoCheckUpdate = AutoCheckUpdate;
+        s.EnableLookupCache = EnableLookupCache;
+        s.CacheTtlDays = CacheTtlDays;
 
         await _settingsService.SaveAsync();
 
@@ -345,5 +361,12 @@ public partial class SettingsViewModel : ObservableObject
         {
             IsCheckingUpdate = false;
         }
+    }
+
+    [RelayCommand]
+    private async Task ClearCacheAsync()
+    {
+        await _cacheService.ClearAsync();
+        CacheEntryCount = _cacheService.Count;
     }
 }

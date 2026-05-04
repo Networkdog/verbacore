@@ -132,4 +132,12 @@ Download and install now?</sys:String>
     <sys:String x:Key="Update_UpToDate">You are running the latest version of VerbaCore.</sys:String>
     <sys:String x:Key="Update_Failed">Update check failed. Please try again later.</sys:String>
 
+    <sys:String x:Key="Settings_CacheSection">Cache</sys:String>
+    <sys:String x:Key="Settings_EnableCache">Enable lookup cache</sys:String>
+    <sys:String x:Key="Settings_EnableCacheHint">Reuse stored results for identical queries to avoid redundant LLM calls.</sys:String>
+    <sys:String x:Key="Settings_CacheTtlDays">Cache lifetime (days)</sys:String>
+    <sys:String x:Key="Settings_CacheEntryCount">Stored entries:</sys:String>
+    <sys:String x:Key="Settings_ClearCache">Clear cache</sys:String>
+    <sys:String x:Key="Overlay_StatusCached">Loaded from cache</sys:String>
+
 </ResourceDictionary>

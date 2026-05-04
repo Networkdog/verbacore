@@ -132,4 +132,12 @@ Backspace: 文字削除</sys:String>
     <sys:String x:Key="Update_UpToDate">最新バージョンを使用しています。</sys:String>
     <sys:String x:Key="Update_Failed">更新の確認に失敗しました。後でもう一度お試しください。</sys:String>
 
+    <sys:String x:Key="Settings_CacheSection">キャッシュ</sys:String>
+    <sys:String x:Key="Settings_EnableCache">検索結果のキャッシュを使用</sys:String>
+    <sys:String x:Key="Settings_EnableCacheHint">同じ検索リクエスト時、LLM 呼び出しを省略して保存済みの結果を即座に表示します。</sys:String>
+    <sys:String x:Key="Settings_CacheTtlDays">キャッシュ保持期間 (日)</sys:String>
+    <sys:String x:Key="Settings_CacheEntryCount">保存済み項目:</sys:String>
+    <sys:String x:Key="Settings_ClearCache">キャッシュを削除</sys:String>
+    <sys:String x:Key="Overlay_StatusCached">キャッシュから読み込みました</sys:String>
+
 </ResourceDictionary>
