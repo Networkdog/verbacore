@@ -20,6 +20,8 @@ public sealed class LocalizationService
         var uri = language switch
         {
             UiLanguage.English => new Uri("Resources/Strings.en.xaml", UriKind.Relative),
+            UiLanguage.Chinese => new Uri("Resources/Strings.zh.xaml", UriKind.Relative),
+            UiLanguage.Japanese => new Uri("Resources/Strings.ja.xaml", UriKind.Relative),
             _ => new Uri("Resources/Strings.ko.xaml", UriKind.Relative)
         };
 

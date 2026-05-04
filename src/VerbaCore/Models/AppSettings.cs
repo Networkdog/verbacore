@@ -67,5 +67,7 @@ public enum OverlaySize
 public enum UiLanguage
 {
     Korean,
-    English
+    English,
+    Chinese,
+    Japanese
 }

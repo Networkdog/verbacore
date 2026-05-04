@@ -131,7 +131,7 @@ public partial class SettingsViewModel : ObservableObject
     public string[] AvailableProviders { get; } = ["OpenAI", "Anthropic", "Google Gemini", "OpenRouter", "Azure OpenAI", "Custom"];
     public string[] AvailableReasoningEfforts { get; } = ["none", "minimal", "low", "medium", "high", "xhigh"];
     public string[] AvailableThemes { get; } = ["System", "Light", "Dark"];
-    public string[] AvailableUiLanguages { get; } = ["한국어", "English"];
+    public string[] AvailableUiLanguages { get; } = ["한국어", "English", "中文", "日本語"];
     public string[] AvailableLanguages { get; } =
     [
         "Korean", "English", "Japanese", "Chinese", "Spanish", "French",
@@ -221,6 +221,8 @@ public partial class SettingsViewModel : ObservableObject
         SelectedUiLanguage = s.UiLanguage switch
         {
             Models.UiLanguage.English => "English",
+            Models.UiLanguage.Chinese => "中文",
+            Models.UiLanguage.Japanese => "日本語",
             _ => "한국어"
         };
 
@@ -285,6 +287,8 @@ public partial class SettingsViewModel : ObservableObject
         s.UiLanguage = SelectedUiLanguage switch
         {
             "English" => Models.UiLanguage.English,
+            "中文" => Models.UiLanguage.Chinese,
+            "日本語" => Models.UiLanguage.Japanese,
             _ => Models.UiLanguage.Korean
         };
 

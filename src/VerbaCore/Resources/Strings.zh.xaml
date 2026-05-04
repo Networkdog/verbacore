@@ -1,0 +1,118 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=mscorlib">
+
+    <!-- Overlay -->
+    <sys:String x:Key="Overlay_Loading">查询中...</sys:String>
+    <sys:String x:Key="Overlay_ModeDict">📖 词典</sys:String>
+    <sys:String x:Key="Overlay_ModeTrans">🔄 翻译</sys:String>
+    <sys:String x:Key="Overlay_ModeAssist">💡 助手</sys:String>
+    <sys:String x:Key="Overlay_HintModeSwitch">  ·  Tab: 切换模式</sys:String>
+    <sys:String x:Key="Overlay_StatusDefault">按住 CapsLock 并输入单词</sys:String>
+    <sys:String x:Key="Overlay_StatusCopied">结果已复制到剪贴板</sys:String>
+    <sys:String x:Key="Overlay_StatusInputPrompt">请输入单词 — Enter: 查询, CapsLock: 关闭</sys:String>
+    <sys:String x:Key="Overlay_StatusDone">完成 — Ctrl+C: 复制 · Esc: 关闭</sys:String>
+    <sys:String x:Key="Overlay_StatusTimeout">已超时</sys:String>
+    <sys:String x:Key="Overlay_StatusError">发生错误</sys:String>
+    <sys:String x:Key="Overlay_TimeoutMarkdown">## ⏰ 已超时
+
+请求已超时，请重试。</sys:String>
+    <sys:String x:Key="Overlay_ErrorMarkdown">## ❌ 错误
+
+{0}
+
+请检查 API Key 和设置。</sys:String>
+
+    <!-- Settings Window -->
+    <sys:String x:Key="Settings_Title">VerbaCore 设置</sys:String>
+    <sys:String x:Key="Settings_TabSettings">⚙ 设置</sys:String>
+    <sys:String x:Key="Settings_TabHistory">📋 历史记录</sys:String>
+
+    <!-- Settings View - API -->
+    <sys:String x:Key="Settings_ApiSection">API 设置</sys:String>
+    <sys:String x:Key="Settings_ApiProvider">API 提供商</sys:String>
+    <sys:String x:Key="Settings_Model">模型</sys:String>
+    <sys:String x:Key="Settings_ModelAzure">模型 (Deployment Name)</sys:String>
+    <sys:String x:Key="Settings_ModelHint">可从列表中选择或直接输入</sys:String>
+    <sys:String x:Key="Settings_ModelAzureHint">请输入 Azure OpenAI 的部署名称</sys:String>
+    <sys:String x:Key="Settings_ReasoningEffort">Reasoning Effort</sys:String>
+    <sys:String x:Key="Settings_ReasoningEffortHint">调整 GPT-5、o1、o3 等推理模型的思考强度</sys:String>
+    <sys:String x:Key="Settings_AzureEndpoint">Azure Endpoint</sys:String>
+    <sys:String x:Key="Settings_AzureApiVersion">API 版本</sys:String>
+    <sys:String x:Key="Settings_CustomEndpoint">自定义 Endpoint</sys:String>
+    <sys:String x:Key="Settings_CustomEndpointPlaceholder">http://localhost:11434 或 https://your-server.com</sys:String>
+    <sys:String x:Key="Settings_CustomEndpointHint">兼容 OpenAI 的 API 端点 (Ollama、LM Studio 等)</sys:String>
+
+    <!-- Settings View - Language -->
+    <sys:String x:Key="Settings_LanguageSection">语言设置</sys:String>
+    <sys:String x:Key="Settings_NativeLanguage">母语</sys:String>
+    <sys:String x:Key="Settings_NativeLanguageHint">用于显示释义和翻译结果的语言</sys:String>
+    <sys:String x:Key="Settings_ForeignLanguage">外语</sys:String>
+    <sys:String x:Key="Settings_ForeignLanguageHint">主要学习或翻译的目标语言</sys:String>
+
+    <!-- Settings View - Input -->
+    <sys:String x:Key="Settings_InputSection">输入设置</sys:String>
+    <sys:String x:Key="Settings_GlobalHotkey">全局快捷键</sys:String>
+    <sys:String x:Key="Settings_GlobalHotkeyHint">可在任何位置通过快捷键激活 VerbaCore</sys:String>
+
+    <!-- Settings View - Appearance -->
+    <sys:String x:Key="Settings_AppearanceSection">外观</sys:String>
+    <sys:String x:Key="Settings_UiLanguage">界面语言</sys:String>
+    <sys:String x:Key="Settings_UiLanguageHint">应用界面的显示语言</sys:String>
+    <sys:String x:Key="Settings_Theme">主题</sys:String>
+    <sys:String x:Key="Settings_OverlayPosition">悬浮窗位置</sys:String>
+    <sys:String x:Key="Settings_OverlayPositionHint">悬浮窗在屏幕上的显示位置</sys:String>
+    <sys:String x:Key="Settings_OverlaySize">悬浮窗大小</sys:String>
+    <sys:String x:Key="Settings_OverlaySizeHint">悬浮窗的默认大小</sys:String>
+
+    <!-- Settings View - System -->
+    <sys:String x:Key="Settings_SystemSection">系统</sys:String>
+    <sys:String x:Key="Settings_StartWithWindows">开机自启动</sys:String>
+    <sys:String x:Key="Settings_StartWithWindowsHint">在 Windows 启动时自动运行 VerbaCore</sys:String>
+    <sys:String x:Key="Settings_SaveButton">保存设置</sys:String>
+    <sys:String x:Key="Settings_SavedMessage">设置已保存。</sys:String>
+
+    <!-- Settings View - Positions -->
+    <sys:String x:Key="Position_TopLeft">左上</sys:String>
+    <sys:String x:Key="Position_TopCenter">上中</sys:String>
+    <sys:String x:Key="Position_TopRight">右上</sys:String>
+    <sys:String x:Key="Position_CenterLeft">左中</sys:String>
+    <sys:String x:Key="Position_Center">居中</sys:String>
+    <sys:String x:Key="Position_CenterRight">右中</sys:String>
+    <sys:String x:Key="Position_BottomLeft">左下</sys:String>
+    <sys:String x:Key="Position_BottomCenter">下中</sys:String>
+    <sys:String x:Key="Position_BottomRight">右下</sys:String>
+
+    <!-- Settings View - Sizes -->
+    <sys:String x:Key="Size_Small">小</sys:String>
+    <sys:String x:Key="Size_Medium">中</sys:String>
+    <sys:String x:Key="Size_Large">大</sys:String>
+
+    <!-- History View -->
+    <sys:String x:Key="History_SearchPlaceholder">搜索历史记录...</sys:String>
+    <sys:String x:Key="History_ClearAll">全部清除</sys:String>
+    <sys:String x:Key="History_Requery">重新查询</sys:String>
+    <sys:String x:Key="History_CopyResult">复制结果</sys:String>
+    <sys:String x:Key="History_Delete">删除</sys:String>
+    <sys:String x:Key="History_Empty">暂无查询记录</sys:String>
+
+    <!-- Tray -->
+    <sys:String x:Key="Tray_Settings">⚙ 设置</sys:String>
+    <sys:String x:Key="Tray_About">关于 VerbaCore</sys:String>
+    <sys:String x:Key="Tray_Exit">退出</sys:String>
+    <sys:String x:Key="Tray_Tooltip">VerbaCore — 通过 CapsLock 启用的 AI 词典/翻译</sys:String>
+    <sys:String x:Key="Tray_AlreadyRunning">VerbaCore 已在运行。</sys:String>
+    <sys:String x:Key="Tray_AboutText">VerbaCore — 轻量级 AI 词典 &amp; 翻译
+
+按住 CapsLock 并输入单词。
+松开 CapsLock 即可显示 AI 结果。
+
+Tab: 切换模式 (词典/翻译)
+Esc: 取消
+Backspace: 删除字符</sys:String>
+
+    <!-- Azure key placeholder -->
+    <sys:String x:Key="AzureKeyPlaceholder_True">Azure API Key</sys:String>
+    <sys:String x:Key="AzureKeyPlaceholder_False">sk-...</sys:String>
+
+</ResourceDictionary>

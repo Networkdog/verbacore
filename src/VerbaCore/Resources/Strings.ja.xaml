@@ -1,0 +1,118 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=mscorlib">
+
+    <!-- Overlay -->
+    <sys:String x:Key="Overlay_Loading">検索中...</sys:String>
+    <sys:String x:Key="Overlay_ModeDict">📖 辞書</sys:String>
+    <sys:String x:Key="Overlay_ModeTrans">🔄 翻訳</sys:String>
+    <sys:String x:Key="Overlay_ModeAssist">💡 アシスト</sys:String>
+    <sys:String x:Key="Overlay_HintModeSwitch">  ·  Tab: モード切替</sys:String>
+    <sys:String x:Key="Overlay_StatusDefault">CapsLock を押しながら単語を入力してください</sys:String>
+    <sys:String x:Key="Overlay_StatusCopied">結果をクリップボードにコピーしました</sys:String>
+    <sys:String x:Key="Overlay_StatusInputPrompt">単語を入力 — Enter: 検索, CapsLock: 閉じる</sys:String>
+    <sys:String x:Key="Overlay_StatusDone">完了 — Ctrl+C: コピー · Esc: 閉じる</sys:String>
+    <sys:String x:Key="Overlay_StatusTimeout">タイムアウト</sys:String>
+    <sys:String x:Key="Overlay_StatusError">エラーが発生しました</sys:String>
+    <sys:String x:Key="Overlay_TimeoutMarkdown">## ⏰ タイムアウト
+
+リクエストがタイムアウトしました。もう一度お試しください。</sys:String>
+    <sys:String x:Key="Overlay_ErrorMarkdown">## ❌ エラー
+
+{0}
+
+API キーと設定をご確認ください。</sys:String>
+
+    <!-- Settings Window -->
+    <sys:String x:Key="Settings_Title">VerbaCore 設定</sys:String>
+    <sys:String x:Key="Settings_TabSettings">⚙ 設定</sys:String>
+    <sys:String x:Key="Settings_TabHistory">📋 履歴</sys:String>
+
+    <!-- Settings View - API -->
+    <sys:String x:Key="Settings_ApiSection">API 設定</sys:String>
+    <sys:String x:Key="Settings_ApiProvider">API プロバイダー</sys:String>
+    <sys:String x:Key="Settings_Model">モデル</sys:String>
+    <sys:String x:Key="Settings_ModelAzure">モデル (Deployment Name)</sys:String>
+    <sys:String x:Key="Settings_ModelHint">リストから選択するか直接入力できます</sys:String>
+    <sys:String x:Key="Settings_ModelAzureHint">Azure OpenAI のデプロイ名を入力してください</sys:String>
+    <sys:String x:Key="Settings_ReasoningEffort">Reasoning Effort</sys:String>
+    <sys:String x:Key="Settings_ReasoningEffortHint">GPT-5、o1、o3 などの推論モデルの思考レベルを調整</sys:String>
+    <sys:String x:Key="Settings_AzureEndpoint">Azure Endpoint</sys:String>
+    <sys:String x:Key="Settings_AzureApiVersion">API バージョン</sys:String>
+    <sys:String x:Key="Settings_CustomEndpoint">カスタム Endpoint</sys:String>
+    <sys:String x:Key="Settings_CustomEndpointPlaceholder">http://localhost:11434 または https://your-server.com</sys:String>
+    <sys:String x:Key="Settings_CustomEndpointHint">OpenAI 互換 API エンドポイント (Ollama、LM Studio など)</sys:String>
+
+    <!-- Settings View - Language -->
+    <sys:String x:Key="Settings_LanguageSection">言語設定</sys:String>
+    <sys:String x:Key="Settings_NativeLanguage">母語</sys:String>
+    <sys:String x:Key="Settings_NativeLanguageHint">解説や翻訳結果を表示する言語</sys:String>
+    <sys:String x:Key="Settings_ForeignLanguage">外国語</sys:String>
+    <sys:String x:Key="Settings_ForeignLanguageHint">主に学習または翻訳する対象言語</sys:String>
+
+    <!-- Settings View - Input -->
+    <sys:String x:Key="Settings_InputSection">入力設定</sys:String>
+    <sys:String x:Key="Settings_GlobalHotkey">グローバルショートカット</sys:String>
+    <sys:String x:Key="Settings_GlobalHotkeyHint">どこからでもショートカットで VerbaCore を起動します</sys:String>
+
+    <!-- Settings View - Appearance -->
+    <sys:String x:Key="Settings_AppearanceSection">外観</sys:String>
+    <sys:String x:Key="Settings_UiLanguage">UI 言語</sys:String>
+    <sys:String x:Key="Settings_UiLanguageHint">アプリのインターフェース表示言語</sys:String>
+    <sys:String x:Key="Settings_Theme">テーマ</sys:String>
+    <sys:String x:Key="Settings_OverlayPosition">検索ウィンドウの位置</sys:String>
+    <sys:String x:Key="Settings_OverlayPositionHint">検索ウィンドウを画面のどこに表示するか</sys:String>
+    <sys:String x:Key="Settings_OverlaySize">検索ウィンドウのサイズ</sys:String>
+    <sys:String x:Key="Settings_OverlaySizeHint">検索ウィンドウのデフォルトサイズ</sys:String>
+
+    <!-- Settings View - System -->
+    <sys:String x:Key="Settings_SystemSection">システム</sys:String>
+    <sys:String x:Key="Settings_StartWithWindows">Windows 起動時に実行</sys:String>
+    <sys:String x:Key="Settings_StartWithWindowsHint">PC 起動時に VerbaCore を自動的に起動します</sys:String>
+    <sys:String x:Key="Settings_SaveButton">設定を保存</sys:String>
+    <sys:String x:Key="Settings_SavedMessage">設定を保存しました。</sys:String>
+
+    <!-- Settings View - Positions -->
+    <sys:String x:Key="Position_TopLeft">左上</sys:String>
+    <sys:String x:Key="Position_TopCenter">上中央</sys:String>
+    <sys:String x:Key="Position_TopRight">右上</sys:String>
+    <sys:String x:Key="Position_CenterLeft">左中央</sys:String>
+    <sys:String x:Key="Position_Center">中央</sys:String>
+    <sys:String x:Key="Position_CenterRight">右中央</sys:String>
+    <sys:String x:Key="Position_BottomLeft">左下</sys:String>
+    <sys:String x:Key="Position_BottomCenter">下中央</sys:String>
+    <sys:String x:Key="Position_BottomRight">右下</sys:String>
+
+    <!-- Settings View - Sizes -->
+    <sys:String x:Key="Size_Small">小</sys:String>
+    <sys:String x:Key="Size_Medium">中</sys:String>
+    <sys:String x:Key="Size_Large">大</sys:String>
+
+    <!-- History View -->
+    <sys:String x:Key="History_SearchPlaceholder">履歴を検索...</sys:String>
+    <sys:String x:Key="History_ClearAll">すべて削除</sys:String>
+    <sys:String x:Key="History_Requery">再検索</sys:String>
+    <sys:String x:Key="History_CopyResult">結果をコピー</sys:String>
+    <sys:String x:Key="History_Delete">削除</sys:String>
+    <sys:String x:Key="History_Empty">検索履歴がありません</sys:String>
+
+    <!-- Tray -->
+    <sys:String x:Key="Tray_Settings">⚙ 設定</sys:String>
+    <sys:String x:Key="Tray_About">VerbaCore について</sys:String>
+    <sys:String x:Key="Tray_Exit">終了</sys:String>
+    <sys:String x:Key="Tray_Tooltip">VerbaCore — CapsLock で AI 辞書/翻訳</sys:String>
+    <sys:String x:Key="Tray_AlreadyRunning">VerbaCore はすでに実行中です。</sys:String>
+    <sys:String x:Key="Tray_AboutText">VerbaCore — 軽量 AI 辞書 &amp; 翻訳
+
+CapsLock を押しながら単語を入力してください。
+CapsLock を離すと AI が結果を表示します。
+
+Tab: モード切替 (辞書/翻訳)
+Esc: キャンセル
+Backspace: 文字削除</sys:String>
+
+    <!-- Azure key placeholder -->
+    <sys:String x:Key="AzureKeyPlaceholder_True">Azure API Key</sys:String>
+    <sys:String x:Key="AzureKeyPlaceholder_False">sk-...</sys:String>
+
+</ResourceDictionary>
