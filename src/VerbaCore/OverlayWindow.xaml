@@ -157,7 +157,7 @@
                             <RotateTransform x:Name="SpinnerRotation" Angle="0" />
                         </Ellipse.RenderTransform>
                     </Ellipse>
-                    <TextBlock Text="조회 중..."
+                    <TextBlock Text="{DynamicResource Overlay_Loading}"
                                FontSize="13"
                                FontFamily="{StaticResource AppUIFont}"
                                Foreground="#60FFFFFF"
@@ -175,13 +175,13 @@
                     <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
                         <Border Background="#20FFFFFF" CornerRadius="8" Padding="10,4">
                             <TextBlock x:Name="ModeLabel"
-                                       Text="📖 사전"
+                                       Text="{DynamicResource Overlay_ModeDict}"
                                        FontSize="14"
                                        FontFamily="{StaticResource AppUIFont}"
                                        Foreground="#B0FFFFFF"
                                        VerticalAlignment="Center" />
                         </Border>
-                        <TextBlock Text="  ·  Tab: 모드 전환"
+                        <TextBlock Text="{DynamicResource Overlay_HintModeSwitch}"
                                    FontSize="13"
                                    FontFamily="{StaticResource AppUIFont}"
                                    Foreground="#35FFFFFF"
@@ -191,7 +191,7 @@
 
                     <TextBlock Grid.Column="1"
                                x:Name="StatusLabel"
-                               Text="CapsLock을 누른 채로 단어를 입력하세요"
+                               Text="{DynamicResource Overlay_StatusDefault}"
                                FontSize="13"
                                FontFamily="{StaticResource AppUIFont}"
                                Foreground="#40FFFFFF"

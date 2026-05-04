@@ -1,0 +1,118 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=mscorlib">
+
+    <!-- Overlay -->
+    <sys:String x:Key="Overlay_Loading">Loading...</sys:String>
+    <sys:String x:Key="Overlay_ModeDict">📖 Dictionary</sys:String>
+    <sys:String x:Key="Overlay_ModeTrans">🔄 Translate</sys:String>
+    <sys:String x:Key="Overlay_ModeAssist">💡 Assist</sys:String>
+    <sys:String x:Key="Overlay_HintModeSwitch">  ·  Tab: Switch mode</sys:String>
+    <sys:String x:Key="Overlay_StatusDefault">Hold CapsLock and type a word</sys:String>
+    <sys:String x:Key="Overlay_StatusCopied">Result copied to clipboard</sys:String>
+    <sys:String x:Key="Overlay_StatusInputPrompt">Type a word — Enter: Look up, CapsLock: Close</sys:String>
+    <sys:String x:Key="Overlay_StatusDone">Done — Ctrl+C: Copy · Esc: Close</sys:String>
+    <sys:String x:Key="Overlay_StatusTimeout">Timed out</sys:String>
+    <sys:String x:Key="Overlay_StatusError">Error occurred</sys:String>
+    <sys:String x:Key="Overlay_TimeoutMarkdown">## ⏰ Timed Out
+
+The request timed out. Please try again.</sys:String>
+    <sys:String x:Key="Overlay_ErrorMarkdown">## ❌ Error
+
+{0}
+
+Please check your API Key and settings.</sys:String>
+
+    <!-- Settings Window -->
+    <sys:String x:Key="Settings_Title">VerbaCore Settings</sys:String>
+    <sys:String x:Key="Settings_TabSettings">⚙ Settings</sys:String>
+    <sys:String x:Key="Settings_TabHistory">📋 History</sys:String>
+
+    <!-- Settings View - API -->
+    <sys:String x:Key="Settings_ApiSection">API Settings</sys:String>
+    <sys:String x:Key="Settings_ApiProvider">API Provider</sys:String>
+    <sys:String x:Key="Settings_Model">Model</sys:String>
+    <sys:String x:Key="Settings_ModelAzure">Model (Deployment Name)</sys:String>
+    <sys:String x:Key="Settings_ModelHint">Select from list or type directly</sys:String>
+    <sys:String x:Key="Settings_ModelAzureHint">Enter your Azure OpenAI deployment name</sys:String>
+    <sys:String x:Key="Settings_ReasoningEffort">Reasoning Effort</sys:String>
+    <sys:String x:Key="Settings_ReasoningEffortHint">Adjust reasoning level for GPT-5, o1, o3 etc.</sys:String>
+    <sys:String x:Key="Settings_AzureEndpoint">Azure Endpoint</sys:String>
+    <sys:String x:Key="Settings_AzureApiVersion">API Version</sys:String>
+    <sys:String x:Key="Settings_CustomEndpoint">Custom Endpoint</sys:String>
+    <sys:String x:Key="Settings_CustomEndpointPlaceholder">http://localhost:11434 or https://your-server.com</sys:String>
+    <sys:String x:Key="Settings_CustomEndpointHint">OpenAI-compatible API endpoint (Ollama, LM Studio, etc.)</sys:String>
+
+    <!-- Settings View - Language -->
+    <sys:String x:Key="Settings_LanguageSection">Language Settings</sys:String>
+    <sys:String x:Key="Settings_NativeLanguage">Native Language</sys:String>
+    <sys:String x:Key="Settings_NativeLanguageHint">Language for definitions and translations</sys:String>
+    <sys:String x:Key="Settings_ForeignLanguage">Foreign Language</sys:String>
+    <sys:String x:Key="Settings_ForeignLanguageHint">Target language for learning and translation</sys:String>
+
+    <!-- Settings View - Input -->
+    <sys:String x:Key="Settings_InputSection">Input Settings</sys:String>
+    <sys:String x:Key="Settings_GlobalHotkey">Global Hotkey</sys:String>
+    <sys:String x:Key="Settings_GlobalHotkeyHint">Activate VerbaCore from anywhere with a hotkey</sys:String>
+
+    <!-- Settings View - Appearance -->
+    <sys:String x:Key="Settings_AppearanceSection">Appearance</sys:String>
+    <sys:String x:Key="Settings_UiLanguage">UI Language</sys:String>
+    <sys:String x:Key="Settings_UiLanguageHint">App interface display language</sys:String>
+    <sys:String x:Key="Settings_Theme">Theme</sys:String>
+    <sys:String x:Key="Settings_OverlayPosition">Overlay Position</sys:String>
+    <sys:String x:Key="Settings_OverlayPositionHint">Where the overlay appears on screen</sys:String>
+    <sys:String x:Key="Settings_OverlaySize">Overlay Size</sys:String>
+    <sys:String x:Key="Settings_OverlaySizeHint">Default size of the overlay</sys:String>
+
+    <!-- Settings View - System -->
+    <sys:String x:Key="Settings_SystemSection">System</sys:String>
+    <sys:String x:Key="Settings_StartWithWindows">Start with Windows</sys:String>
+    <sys:String x:Key="Settings_StartWithWindowsHint">Automatically launch VerbaCore on startup</sys:String>
+    <sys:String x:Key="Settings_SaveButton">Save Settings</sys:String>
+    <sys:String x:Key="Settings_SavedMessage">Settings saved.</sys:String>
+
+    <!-- Settings View - Positions -->
+    <sys:String x:Key="Position_TopLeft">Top Left</sys:String>
+    <sys:String x:Key="Position_TopCenter">Top Center</sys:String>
+    <sys:String x:Key="Position_TopRight">Top Right</sys:String>
+    <sys:String x:Key="Position_CenterLeft">Center Left</sys:String>
+    <sys:String x:Key="Position_Center">Center</sys:String>
+    <sys:String x:Key="Position_CenterRight">Center Right</sys:String>
+    <sys:String x:Key="Position_BottomLeft">Bottom Left</sys:String>
+    <sys:String x:Key="Position_BottomCenter">Bottom Center</sys:String>
+    <sys:String x:Key="Position_BottomRight">Bottom Right</sys:String>
+
+    <!-- Settings View - Sizes -->
+    <sys:String x:Key="Size_Small">Small</sys:String>
+    <sys:String x:Key="Size_Medium">Medium</sys:String>
+    <sys:String x:Key="Size_Large">Large</sys:String>
+
+    <!-- History View -->
+    <sys:String x:Key="History_SearchPlaceholder">Search history...</sys:String>
+    <sys:String x:Key="History_ClearAll">Clear All</sys:String>
+    <sys:String x:Key="History_Requery">Re-query</sys:String>
+    <sys:String x:Key="History_CopyResult">Copy result</sys:String>
+    <sys:String x:Key="History_Delete">Delete</sys:String>
+    <sys:String x:Key="History_Empty">No lookup history</sys:String>
+
+    <!-- Tray -->
+    <sys:String x:Key="Tray_Settings">⚙ Settings</sys:String>
+    <sys:String x:Key="Tray_About">About VerbaCore</sys:String>
+    <sys:String x:Key="Tray_Exit">Exit</sys:String>
+    <sys:String x:Key="Tray_Tooltip">VerbaCore — AI Dictionary/Translator via CapsLock</sys:String>
+    <sys:String x:Key="Tray_AlreadyRunning">VerbaCore is already running.</sys:String>
+    <sys:String x:Key="Tray_AboutText">VerbaCore — Lightweight AI Dictionary &amp; Translator
+
+Hold CapsLock and type a word.
+Release CapsLock to see AI results.
+
+Tab: Switch mode (Dictionary/Translate)
+Esc: Cancel
+Backspace: Delete character</sys:String>
+
+    <!-- Azure key placeholder -->
+    <sys:String x:Key="AzureKeyPlaceholder_True">Azure API Key</sys:String>
+    <sys:String x:Key="AzureKeyPlaceholder_False">sk-...</sys:String>
+
+</ResourceDictionary>

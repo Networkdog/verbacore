@@ -3,7 +3,8 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
         xmlns:views="clr-namespace:VerbaCore.Views"
-        Title="VerbaCore 설정"
+        Title="{DynamicResource Settings_Title}"
+        Icon="pack://application:,,,/res/icons/verbacore.ico"
         Width="480" Height="620"
         MinWidth="400" MinHeight="500"
         WindowStartupLocation="CenterScreen"
@@ -19,7 +20,7 @@
         </Grid.RowDefinitions>
 
         <ui:TitleBar Grid.Row="0"
-                     Title="VerbaCore 설정"
+                     Title="{DynamicResource Settings_Title}"
                      ShowMinimize="False"
                      ShowMaximize="False"
                      ShowClose="True" />
@@ -34,11 +35,11 @@
                 </Style>
             </TabControl.Resources>
 
-            <TabItem Header="⚙ 설정">
+            <TabItem Header="{DynamicResource Settings_TabSettings}">
                 <views:SettingsView x:Name="SettingsViewPage" />
             </TabItem>
 
-            <TabItem Header="📋 히스토리">
+            <TabItem Header="{DynamicResource Settings_TabHistory}">
                 <views:HistoryView x:Name="HistoryViewPage" />
             </TabItem>
         </TabControl>

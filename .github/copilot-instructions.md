@@ -23,12 +23,15 @@ src/VerbaCore/
 ├── OverlayWindow.xaml(.cs)    — Transparent fullscreen overlay (input & results)
 ├── SettingsWindow.xaml(.cs)   — FluentWindow(Mica) settings + history
 ├── Models/
-│   ├── AppSettings.cs         — Settings model + Enums (ApiProvider, OverlayPosition, OverlaySize, ThemeMode)
+│   ├── AppSettings.cs         — Settings model + Enums (ApiProvider, OverlayPosition, OverlaySize, ThemeMode, UiLanguage)
 │   ├── AppJsonContext.cs      — System.Text.Json source generation contexts
 │   ├── LookupResult.cs        — Lookup result + LookupMode enum (Dictionary, Translate, Assist)
 │   └── LookupHistory.cs       — History item model
 ├── ViewModels/                — SettingsViewModel, HistoryViewModel
 ├── Views/                     — SettingsView, HistoryView (UserControls)
+├── Resources/
+│   ├── Strings.ko.xaml        — Korean UI string resources
+│   └── Strings.en.xaml        — English UI string resources
 ├── Services/
 │   ├── CapsLockService.cs     — Low-level keyboard hook, EnsoHold/QuickTap detection
 │   ├── OpenAiService.cs       — 6-provider SSE streaming + Utf8JsonReader parsing
@@ -36,6 +39,7 @@ src/VerbaCore/
 │   ├── SettingsService.cs     — JSON settings load/save + DPAPI (source-generated)
 │   ├── HistoryService.cs      — JSON history + debounced save (source-generated)
 │   ├── HotkeyService.cs       — NHotkey global hotkey registration/unregistration
+│   ├── LocalizationService.cs — Runtime UI language switching via ResourceDictionary swap
 │   └── CursorTextService.cs   — COM UIA3 selected text extraction
 └── Helpers/
     ├── NativeMethods.cs       — Win32 P/Invoke + CachedModuleHandle
@@ -68,6 +72,7 @@ src/VerbaCore/
 3. **3 Lookup Modes**: Dictionary(≤3 words), Translate(>3 words), Assist(code/URL/formula/non-language) — `PromptBuilder.AutoSelectMode()` auto-selects
 4. **Overlay**: Transparent `Window` + `AllowsTransparency="True"`. 220ms fade in / 180ms fade out. Global mouse hook for outside-click detection
 5. **System tray**: `NotifyIcon` + `ShutdownMode="OnExplicitShutdown"`. Only tray exit terminates the app
+6. **Localization**: `ResourceDictionary` swap (`Strings.ko.xaml`/`Strings.en.xaml`) via `LocalizationService`. XAML uses `DynamicResource`; code-behind uses `Loc("key")` helper. Language persisted as `UiLanguage` enum in settings
 
 ## Build & Run
 ```bash

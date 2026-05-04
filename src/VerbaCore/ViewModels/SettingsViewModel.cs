@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using VerbaCore.Models;
@@ -9,6 +10,30 @@ namespace VerbaCore.ViewModels;
 public partial class SettingsViewModel : ObservableObject
 {
     private readonly SettingsService _settingsService;
+    private readonly LocalizationService _localizationService;
+
+    private static string Loc(string key) =>
+        Application.Current.TryFindResource(key) as string ?? key;
+
+    private static readonly (OverlayPosition Enum, string Key)[] PositionEntries =
+    [
+        (OverlayPosition.TopLeft, "Position_TopLeft"),
+        (OverlayPosition.TopCenter, "Position_TopCenter"),
+        (OverlayPosition.TopRight, "Position_TopRight"),
+        (OverlayPosition.CenterLeft, "Position_CenterLeft"),
+        (OverlayPosition.CenterCenter, "Position_Center"),
+        (OverlayPosition.CenterRight, "Position_CenterRight"),
+        (OverlayPosition.BottomLeft, "Position_BottomLeft"),
+        (OverlayPosition.BottomCenter, "Position_BottomCenter"),
+        (OverlayPosition.BottomRight, "Position_BottomRight"),
+    ];
+
+    private static readonly (OverlaySize Enum, string Key)[] SizeEntries =
+    [
+        (Models.OverlaySize.Small, "Size_Small"),
+        (Models.OverlaySize.Medium, "Size_Medium"),
+        (Models.OverlaySize.Large, "Size_Large"),
+    ];
 
     private static readonly Dictionary<string, string[]> ModelCatalog = new()
     {
@@ -80,10 +105,13 @@ public partial class SettingsViewModel : ObservableObject
     private string _selectedTheme = "System";
 
     [ObservableProperty]
-    private string _popupPosition = "가운데";
+    private string _popupPosition = string.Empty;
 
     [ObservableProperty]
-    private string _overlaySize = "중간";
+    private string _overlaySize = string.Empty;
+
+    [ObservableProperty]
+    private string _selectedUiLanguage = "한국어";
 
     [ObservableProperty]
     private string _globalHotkey = "Ctrl+Alt+V";
@@ -98,16 +126,12 @@ public partial class SettingsViewModel : ObservableObject
     private string _statusMessage = string.Empty;
 
     public ObservableCollection<string> AvailableModels { get; } = new();
+    public ObservableCollection<string> AvailablePositions { get; } = new();
+    public ObservableCollection<string> AvailableSizes { get; } = new();
     public string[] AvailableProviders { get; } = ["OpenAI", "Anthropic", "Google Gemini", "OpenRouter", "Azure OpenAI", "Custom"];
     public string[] AvailableReasoningEfforts { get; } = ["none", "minimal", "low", "medium", "high", "xhigh"];
     public string[] AvailableThemes { get; } = ["System", "Light", "Dark"];
-    public string[] AvailablePositions { get; } =
-    [
-        "왼쪽 위", "위 가운데", "오른쪽 위",
-        "왼쪽 가운데", "가운데", "오른쪽 가운데",
-        "왼쪽 아래", "아래 가운데", "오른쪽 아래"
-    ];
-    public string[] AvailableSizes { get; } = ["작게", "중간", "크게"];
+    public string[] AvailableUiLanguages { get; } = ["한국어", "English"];
     public string[] AvailableLanguages { get; } =
     [
         "Korean", "English", "Japanese", "Chinese", "Spanish", "French",
@@ -116,10 +140,38 @@ public partial class SettingsViewModel : ObservableObject
         "Swedish", "Czech"
     ];
 
-    public SettingsViewModel(SettingsService settingsService)
+    public SettingsViewModel(SettingsService settingsService, LocalizationService localizationService)
     {
         _settingsService = settingsService;
+        _localizationService = localizationService;
+        _localizationService.LanguageChanged += OnLanguageChanged;
         LoadFromSettings();
+    }
+
+    private void OnLanguageChanged()
+    {
+        RefreshLocalizedCollections();
+    }
+
+    private void RefreshLocalizedCollections()
+    {
+        var currentPosEnum = PositionEntries
+            .FirstOrDefault(e => e.Key == PositionEntries
+                .FirstOrDefault(p => Loc(p.Key) == PopupPosition).Key).Enum;
+        var currentSizeEnum = SizeEntries
+            .FirstOrDefault(e => e.Key == SizeEntries
+                .FirstOrDefault(s => Loc(s.Key) == OverlaySize).Key).Enum;
+
+        // Rebuild with new language
+        AvailablePositions.Clear();
+        foreach (var e in PositionEntries) AvailablePositions.Add(Loc(e.Key));
+
+        AvailableSizes.Clear();
+        foreach (var e in SizeEntries) AvailableSizes.Add(Loc(e.Key));
+
+        // Re-select with new display names
+        PopupPosition = Loc(PositionEntries.First(e => e.Enum == currentPosEnum).Key);
+        OverlaySize = Loc(SizeEntries.First(e => e.Enum == currentSizeEnum).Key);
     }
 
     private static string ProviderToString(ApiProvider p) => p switch
@@ -164,24 +216,20 @@ public partial class SettingsViewModel : ObservableObject
             ThemeMode.Dark => "Dark",
             _ => "System"
         };
-        PopupPosition = s.PopupPosition switch
+        PopupPosition = Loc(PositionEntries.First(e => e.Enum == s.PopupPosition).Key);
+        OverlaySize = Loc(SizeEntries.First(e => e.Enum == s.OverlaySize).Key);
+        SelectedUiLanguage = s.UiLanguage switch
         {
-            OverlayPosition.TopLeft => "왼쪽 위",
-            OverlayPosition.TopCenter => "위 가운데",
-            OverlayPosition.TopRight => "오른쪽 위",
-            OverlayPosition.CenterLeft => "왼쪽 가운데",
-            OverlayPosition.CenterRight => "오른쪽 가운데",
-            OverlayPosition.BottomLeft => "왼쪽 아래",
-            OverlayPosition.BottomCenter => "아래 가운데",
-            OverlayPosition.BottomRight => "오른쪽 아래",
-            _ => "가운데"
+            Models.UiLanguage.English => "English",
+            _ => "한국어"
         };
-        OverlaySize = s.OverlaySize switch
-        {
-            Models.OverlaySize.Small => "작게",
-            Models.OverlaySize.Large => "크게",
-            _ => "중간"
-        };
+
+        // Populate localized collections
+        AvailablePositions.Clear();
+        foreach (var e in PositionEntries) AvailablePositions.Add(Loc(e.Key));
+        AvailableSizes.Clear();
+        foreach (var e in SizeEntries) AvailableSizes.Add(Loc(e.Key));
+
         UpdateAvailableModels();
     }
 
@@ -230,23 +278,14 @@ public partial class SettingsViewModel : ObservableObject
             "Dark" => ThemeMode.Dark,
             _ => ThemeMode.System
         };
-        s.PopupPosition = PopupPosition switch
+        s.PopupPosition = PositionEntries
+            .FirstOrDefault(e => Loc(e.Key) == PopupPosition).Enum;
+        s.OverlaySize = SizeEntries
+            .FirstOrDefault(e => Loc(e.Key) == OverlaySize).Enum;
+        s.UiLanguage = SelectedUiLanguage switch
         {
-            "왼쪽 위" => OverlayPosition.TopLeft,
-            "위 가운데" => OverlayPosition.TopCenter,
-            "오른쪽 위" => OverlayPosition.TopRight,
-            "왼쪽 가운데" => OverlayPosition.CenterLeft,
-            "오른쪽 가운데" => OverlayPosition.CenterRight,
-            "왼쪽 아래" => OverlayPosition.BottomLeft,
-            "아래 가운데" => OverlayPosition.BottomCenter,
-            "오른쪽 아래" => OverlayPosition.BottomRight,
-            _ => OverlayPosition.CenterCenter
-        };
-        s.OverlaySize = OverlaySize switch
-        {
-            "작게" => Models.OverlaySize.Small,
-            "크게" => Models.OverlaySize.Large,
-            _ => Models.OverlaySize.Medium
+            "English" => Models.UiLanguage.English,
+            _ => Models.UiLanguage.Korean
         };
 
         await _settingsService.SaveAsync();
@@ -254,6 +293,7 @@ public partial class SettingsViewModel : ObservableObject
         // Apply changes live
         App.ApplyTheme(s.Theme);
         App.ApplyStartWithWindows(s.StartWithWindows);
+        _localizationService.Apply(s.UiLanguage);
 
         // Re-register hotkey if changed
         try
@@ -263,7 +303,7 @@ public partial class SettingsViewModel : ObservableObject
         }
         catch { /* hotkey may fail if already in use */ }
 
-        StatusMessage = "설정이 저장되었습니다.";
+        StatusMessage = Loc("Settings_SavedMessage");
 
         // Auto-clear status (cancel any previous clear timer)
         _statusClearCts?.Cancel();

@@ -19,11 +19,11 @@
         <StackPanel Margin="0,0,0,16">
 
             <!-- API Settings -->
-            <TextBlock Text="API 설정" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,12" />
+            <TextBlock Text="{DynamicResource Settings_ApiSection}" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,12" />
 
             <ui:Card Margin="0,0,0,8">
                 <StackPanel>
-                    <TextBlock Text="API 제공자" Margin="0,0,0,4" FontSize="12" Opacity="0.7" />
+                    <TextBlock Text="{DynamicResource Settings_ApiProvider}" Margin="0,0,0,4" FontSize="12" Opacity="0.7" />
                     <ComboBox ItemsSource="{Binding AvailableProviders}"
                               SelectedItem="{Binding SelectedProvider}" />
                 </StackPanel>
@@ -39,34 +39,22 @@
 
             <ui:Card Margin="0,0,0,8">
                 <StackPanel>
-                    <TextBlock Margin="0,0,0,4" FontSize="12" Opacity="0.7">
-                        <TextBlock.Style>
-                            <Style TargetType="TextBlock">
-                                <Setter Property="Text" Value="모델" />
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding IsAzure}" Value="True">
-                                        <Setter Property="Text" Value="모델 (Deployment Name)" />
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </TextBlock.Style>
-                    </TextBlock>
+                    <TextBlock Margin="0,0,0,4" FontSize="12" Opacity="0.7"
+                               Text="{DynamicResource Settings_Model}"
+                               Visibility="{Binding IsAzure, Converter={StaticResource BoolToVisibilityConverter}, ConverterParameter=Invert}" />
+                    <TextBlock Margin="0,0,0,4" FontSize="12" Opacity="0.7"
+                               Text="{DynamicResource Settings_ModelAzure}"
+                               Visibility="{Binding IsAzure, Converter={StaticResource BoolToVisibilityConverter}}" />
                     <ComboBox ItemsSource="{Binding AvailableModels}"
                               SelectedItem="{Binding SelectedModel}"
                               IsEditable="True"
                               Text="{Binding SelectedModel, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                    <TextBlock FontSize="10" Opacity="0.5" Margin="0,4,0,0">
-                        <TextBlock.Style>
-                            <Style TargetType="TextBlock">
-                                <Setter Property="Text" Value="목록에서 선택하거나 직접 입력할 수 있습니다" />
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding IsAzure}" Value="True">
-                                        <Setter Property="Text" Value="Azure OpenAI의 배포 이름을 입력하세요" />
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </TextBlock.Style>
-                    </TextBlock>
+                    <TextBlock FontSize="10" Opacity="0.5" Margin="0,4,0,0"
+                               Text="{DynamicResource Settings_ModelHint}"
+                               Visibility="{Binding IsAzure, Converter={StaticResource BoolToVisibilityConverter}, ConverterParameter=Invert}" />
+                    <TextBlock FontSize="10" Opacity="0.5" Margin="0,4,0,0"
+                               Text="{DynamicResource Settings_ModelAzureHint}"
+                               Visibility="{Binding IsAzure, Converter={StaticResource BoolToVisibilityConverter}}" />
                 </StackPanel>
             </ui:Card>
 
@@ -77,8 +65,8 @@
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
                     <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                        <TextBlock Text="Reasoning Effort" FontSize="13" />
-                        <TextBlock Text="GPT-5, o1, o3 등 reasoning 모델에서 사고 수준 조절" FontSize="10" Opacity="0.5" />
+                        <TextBlock Text="{DynamicResource Settings_ReasoningEffort}" FontSize="13" />
+                        <TextBlock Text="{DynamicResource Settings_ReasoningEffortHint}" FontSize="10" Opacity="0.5" />
                     </StackPanel>
                     <ComboBox Grid.Column="1"
                               ItemsSource="{Binding AvailableReasoningEfforts}"
@@ -91,7 +79,7 @@
             <StackPanel Visibility="{Binding IsAzure, Converter={StaticResource BoolToVisibilityConverter}}">
                 <ui:Card Margin="0,0,0,8">
                     <StackPanel>
-                        <TextBlock Text="Azure Endpoint" Margin="0,0,0,4" FontSize="12" Opacity="0.7" />
+                        <TextBlock Text="{DynamicResource Settings_AzureEndpoint}" Margin="0,0,0,4" FontSize="12" Opacity="0.7" />
                         <ui:TextBox Text="{Binding AzureEndpoint, Mode=TwoWay}"
                                     PlaceholderText="https://your-resource.openai.azure.com" />
                     </StackPanel>
@@ -99,7 +87,7 @@
 
                 <ui:Card Margin="0,0,0,8">
                     <StackPanel>
-                        <TextBlock Text="API 버전" Margin="0,0,0,4" FontSize="12" Opacity="0.7" />
+                        <TextBlock Text="{DynamicResource Settings_AzureApiVersion}" Margin="0,0,0,4" FontSize="12" Opacity="0.7" />
                         <ui:TextBox Text="{Binding AzureApiVersion, Mode=TwoWay}"
                                     PlaceholderText="2024-10-21" />
                     </StackPanel>
@@ -110,16 +98,16 @@
             <StackPanel Visibility="{Binding IsCustom, Converter={StaticResource BoolToVisibilityConverter}}">
                 <ui:Card Margin="0,0,0,8">
                     <StackPanel>
-                        <TextBlock Text="Custom Endpoint" Margin="0,0,0,4" FontSize="12" Opacity="0.7" />
+                        <TextBlock Text="{DynamicResource Settings_CustomEndpoint}" Margin="0,0,0,4" FontSize="12" Opacity="0.7" />
                         <ui:TextBox Text="{Binding CustomEndpoint, Mode=TwoWay}"
-                                    PlaceholderText="http://localhost:11434 또는 https://your-server.com" />
-                        <TextBlock Text="OpenAI 호환 API 엔드포인트 (Ollama, LM Studio 등)" FontSize="10" Opacity="0.5" Margin="0,4,0,0" />
+                                    PlaceholderText="{DynamicResource Settings_CustomEndpointPlaceholder}" />
+                        <TextBlock Text="{DynamicResource Settings_CustomEndpointHint}" FontSize="10" Opacity="0.5" Margin="0,4,0,0" />
                     </StackPanel>
                 </ui:Card>
             </StackPanel>
 
             <!-- Input Settings -->
-            <TextBlock Text="언어 설정" FontSize="16" FontWeight="SemiBold" Margin="0,16,0,12" />
+            <TextBlock Text="{DynamicResource Settings_LanguageSection}" FontSize="16" FontWeight="SemiBold" Margin="0,16,0,12" />
 
             <ui:Card Margin="0,0,0,8">
                 <Grid>
@@ -128,8 +116,8 @@
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
                     <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                        <TextBlock Text="모국어" FontSize="13" />
-                        <TextBlock Text="해설과 번역 결과가 표시되는 언어" FontSize="10" Opacity="0.5" />
+                        <TextBlock Text="{DynamicResource Settings_NativeLanguage}" FontSize="13" />
+                        <TextBlock Text="{DynamicResource Settings_NativeLanguageHint}" FontSize="10" Opacity="0.5" />
                     </StackPanel>
                     <ComboBox Grid.Column="1"
                               ItemsSource="{Binding AvailableLanguages}"
@@ -146,8 +134,8 @@
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
                     <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                        <TextBlock Text="외국어" FontSize="13" />
-                        <TextBlock Text="주로 학습하거나 번역할 대상 언어" FontSize="10" Opacity="0.5" />
+                        <TextBlock Text="{DynamicResource Settings_ForeignLanguage}" FontSize="13" />
+                        <TextBlock Text="{DynamicResource Settings_ForeignLanguageHint}" FontSize="10" Opacity="0.5" />
                     </StackPanel>
                     <ComboBox Grid.Column="1"
                               ItemsSource="{Binding AvailableLanguages}"
@@ -157,7 +145,7 @@
                 </Grid>
             </ui:Card>
 
-            <TextBlock Text="입력 설정" FontSize="16" FontWeight="SemiBold" Margin="0,16,0,12" />
+            <TextBlock Text="{DynamicResource Settings_InputSection}" FontSize="16" FontWeight="SemiBold" Margin="0,16,0,12" />
 
             <ui:Card Margin="0,0,0,8">
                 <Grid>
@@ -166,8 +154,8 @@
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
                     <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                        <TextBlock Text="글로벌 단축키" FontSize="13" />
-                        <TextBlock Text="어디서나 단축키로 VerbaCore를 활성화합니다" FontSize="11" Opacity="0.6" />
+                        <TextBlock Text="{DynamicResource Settings_GlobalHotkey}" FontSize="13" />
+                        <TextBlock Text="{DynamicResource Settings_GlobalHotkeyHint}" FontSize="11" Opacity="0.6" />
                     </StackPanel>
                     <ui:TextBox Grid.Column="1"
                                 Text="{Binding GlobalHotkey, Mode=TwoWay}"
@@ -177,7 +165,7 @@
             </ui:Card>
 
             <!-- Appearance -->
-            <TextBlock Text="외관" FontSize="16" FontWeight="SemiBold" Margin="0,16,0,12" />
+            <TextBlock Text="{DynamicResource Settings_AppearanceSection}" FontSize="16" FontWeight="SemiBold" Margin="0,16,0,12" />
 
             <ui:Card Margin="0,0,0,8">
                 <Grid>
@@ -185,7 +173,7 @@
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
-                    <TextBlock Grid.Column="0" Text="테마" VerticalAlignment="Center" FontSize="13" />
+                    <TextBlock Grid.Column="0" Text="{DynamicResource Settings_Theme}" VerticalAlignment="Center" FontSize="13" />
                     <ComboBox Grid.Column="1"
                               ItemsSource="{Binding AvailableThemes}"
                               SelectedItem="{Binding SelectedTheme}"
@@ -200,8 +188,25 @@
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
                     <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                        <TextBlock Text="검색창 위치" FontSize="13" />
-                        <TextBlock Text="검색창이 화면에 표시되는 위치" FontSize="10" Opacity="0.5" />
+                        <TextBlock Text="{DynamicResource Settings_UiLanguage}" FontSize="13" />
+                        <TextBlock Text="{DynamicResource Settings_UiLanguageHint}" FontSize="10" Opacity="0.5" />
+                    </StackPanel>
+                    <ComboBox Grid.Column="1"
+                              ItemsSource="{Binding AvailableUiLanguages}"
+                              SelectedItem="{Binding SelectedUiLanguage}"
+                              MinWidth="100" />
+                </Grid>
+            </ui:Card>
+
+            <ui:Card Margin="0,0,0,8">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                        <TextBlock Text="{DynamicResource Settings_OverlayPosition}" FontSize="13" />
+                        <TextBlock Text="{DynamicResource Settings_OverlayPositionHint}" FontSize="10" Opacity="0.5" />
                     </StackPanel>
                     <ComboBox Grid.Column="1"
                               ItemsSource="{Binding AvailablePositions}"
@@ -217,8 +222,8 @@
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
                     <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                        <TextBlock Text="검색창 크기" FontSize="13" />
-                        <TextBlock Text="검색창의 기본 크기를 선택합니다" FontSize="10" Opacity="0.5" />
+                        <TextBlock Text="{DynamicResource Settings_OverlaySize}" FontSize="13" />
+                        <TextBlock Text="{DynamicResource Settings_OverlaySizeHint}" FontSize="10" Opacity="0.5" />
                     </StackPanel>
                     <ComboBox Grid.Column="1"
                               ItemsSource="{Binding AvailableSizes}"
@@ -228,7 +233,7 @@
             </ui:Card>
 
             <!-- System -->
-            <TextBlock Text="시스템" FontSize="16" FontWeight="SemiBold" Margin="0,16,0,12" />
+            <TextBlock Text="{DynamicResource Settings_SystemSection}" FontSize="16" FontWeight="SemiBold" Margin="0,16,0,12" />
 
             <ui:Card Margin="0,0,0,8">
                 <Grid>
@@ -237,8 +242,8 @@
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
                     <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                        <TextBlock Text="Windows 시작 시 실행" FontSize="13" />
-                        <TextBlock Text="컴퓨터 시작 시 VerbaCore를 자동 실행합니다" FontSize="11" Opacity="0.6" />
+                        <TextBlock Text="{DynamicResource Settings_StartWithWindows}" FontSize="13" />
+                        <TextBlock Text="{DynamicResource Settings_StartWithWindowsHint}" FontSize="11" Opacity="0.6" />
                     </StackPanel>
                     <ui:ToggleSwitch Grid.Column="1"
                                      IsChecked="{Binding StartWithWindows}" />
@@ -253,7 +258,7 @@
                 BorderThickness="0,1,0,0"
                 BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}">
             <StackPanel>
-                <ui:Button Content="설정 저장"
+                <ui:Button Content="{DynamicResource Settings_SaveButton}"
                            Appearance="Primary"
                            Command="{Binding SaveSettingsCommand}"
                            HorizontalAlignment="Stretch"

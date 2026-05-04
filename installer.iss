@@ -3,7 +3,7 @@
 
 #define MyAppName "VerbaCore"
 #define MyAppVersion "1.0.0"
-#define MyAppPublisher "VerbaCore"
+#define MyAppPublisher "Networkdog"
 #define MyAppURL "https://github.com/Networkdog/verbacore"
 #define MyAppExeName "VerbaCore.exe"
 
@@ -39,8 +39,7 @@ Name: "startup"; Description: "Windows 시작 시 자동 실행"; GroupDescripti
 
 [Files]
 Source: "publish-standalone\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
-Source: "res\icons\verbacore.ico"; DestDir: "{app}\res\icons"; Flags: ignoreversion
-Source: "res\icons\verbacore.png"; DestDir: "{app}\res\icons"; Flags: ignoreversion
+; Icons are embedded as WPF resources inside the exe — no need to ship them separately.
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"

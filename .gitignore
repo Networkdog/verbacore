@@ -42,3 +42,6 @@ installer-output/
 ## Misc
 *.log
 *.tmp
+
+## AI assistant logs (kept locally, not committed)
+logs/

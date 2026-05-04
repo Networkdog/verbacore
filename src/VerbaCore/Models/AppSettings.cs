@@ -20,6 +20,7 @@ public sealed class AppSettings
     public string GlobalHotkey { get; set; } = "Ctrl+Alt+V";
     public bool StartWithWindows { get; set; } = false;
     public ThemeMode Theme { get; set; } = ThemeMode.System;
+    public UiLanguage UiLanguage { get; set; } = UiLanguage.Korean;
     public double WindowWidth { get; set; } = 520;
     public double WindowHeight { get; set; } = 680;
     public OverlayPosition PopupPosition { get; set; } = OverlayPosition.CenterCenter;
@@ -61,4 +62,10 @@ public enum OverlaySize
     Small,
     Medium,
     Large
+}
+
+public enum UiLanguage
+{
+    Korean,
+    English
 }

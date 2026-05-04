@@ -45,7 +45,12 @@ public sealed class InverseBoolConverter : IValueConverter
 public sealed class BoolToVisibilityConverter : IValueConverter
 {
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
-        => value is true ? Visibility.Visible : Visibility.Collapsed;
+    {
+        var flag = value is true;
+        if (parameter is string s && s.Equals("Invert", StringComparison.OrdinalIgnoreCase))
+            flag = !flag;
+        return flag ? Visibility.Visible : Visibility.Collapsed;
+    }
 
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
         => value is Visibility.Visible;

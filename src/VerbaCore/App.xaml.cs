@@ -29,15 +29,27 @@ public partial class App : Application
         // Services
         services.AddSingleton<SettingsService>();
         services.AddSingleton<HistoryService>();
+        services.AddSingleton<LocalizationService>();
         services.AddSingleton<PromptBuilder>();
         services.AddSingleton<CapsLockService>();
         services.AddSingleton<CursorTextService>();
         services.AddSingleton<HotkeyService>();
-        services.AddHttpClient<IOpenAiService, OpenAiService>(client =>
+        services.AddSingleton<IOpenAiService>(sp =>
         {
-            client.Timeout = TimeSpan.FromSeconds(60);
-            client.DefaultRequestVersion = new Version(2, 0);
-            client.DefaultVersionPolicy = System.Net.Http.HttpVersionPolicy.RequestVersionOrLower;
+            var handler = new System.Net.Http.HttpClientHandler
+            {
+                AutomaticDecompression = System.Net.DecompressionMethods.All
+            };
+            var client = new System.Net.Http.HttpClient(handler, disposeHandler: true)
+            {
+                Timeout = TimeSpan.FromSeconds(60),
+                DefaultRequestVersion = new Version(2, 0),
+                DefaultVersionPolicy = System.Net.Http.HttpVersionPolicy.RequestVersionOrLower
+            };
+            return new OpenAiService(
+                client,
+                sp.GetRequiredService<SettingsService>(),
+                sp.GetRequiredService<PromptBuilder>());
         });
 
         // ViewModels
@@ -61,7 +73,7 @@ public partial class App : Application
         _singleInstanceMutex = new Mutex(true, "VerbaCore_B3F8A2E1-7C4D-4E5A-9B2F-1A3C5D7E9F0B", out var isNew);
         if (!isNew)
         {
-            MessageBox.Show("VerbaCore가 이미 실행 중입니다.", "VerbaCore",
+            MessageBox.Show("VerbaCore is already running.\nVerbaCore가 이미 실행 중입니다.", "VerbaCore",
                 MessageBoxButton.OK, MessageBoxImage.Information);
             Shutdown();
             return;
@@ -78,6 +90,9 @@ public partial class App : Application
 
         // Apply saved settings
         ApplyTheme(settings.Current.Theme);
+
+        var loc = GetService<LocalizationService>();
+        loc.Apply(settings.Current.UiLanguage);
 
         if (settings.IsFirstRun)
         {
@@ -107,76 +122,63 @@ public partial class App : Application
 
     private void SetupTrayIcon()
     {
-        var contextMenu = new System.Windows.Forms.ContextMenuStrip();
-
-        contextMenu.Items.Add("⚙ 설정", null, (_, _) => ShowSettingsWindow());
-        contextMenu.Items.Add("-");
-        contextMenu.Items.Add("VerbaCore 정보", null, (_, _) =>
-            MessageBox.Show(
-                "VerbaCore — 경량 AI 사전 & 번역\n\n" +
-                "CapsLock을 누른 채로 단어를 입력하세요.\n" +
-                "CapsLock을 떼면 AI가 결과를 표시합니다.\n\n" +
-                "Tab: 모드 전환 (사전/번역)\n" +
-                "Esc: 취소\n" +
-                "Backspace: 글자 삭제",
-                "VerbaCore", MessageBoxButton.OK, MessageBoxImage.Information));
-        contextMenu.Items.Add("-");
-        contextMenu.Items.Add("종료", null, (_, _) => ExitApp());
+        var loc = GetService<LocalizationService>();
+        BuildTrayMenu(loc);
 
         _trayIcon = new System.Windows.Forms.NotifyIcon
         {
             Icon = LoadTrayIcon(),
-            Text = "VerbaCore — CapsLock으로 AI 사전/번역",
+            Text = loc.Get("Tray_Tooltip"),
             Visible = true,
-            ContextMenuStrip = contextMenu
+            ContextMenuStrip = _trayContextMenu
         };
 
         _trayIcon.DoubleClick += (_, _) => ShowSettingsWindow();
+
+        loc.LanguageChanged += () =>
+        {
+            BuildTrayMenu(loc);
+            if (_trayIcon is not null)
+            {
+                _trayIcon.Text = loc.Get("Tray_Tooltip");
+                _trayIcon.ContextMenuStrip = _trayContextMenu;
+            }
+        };
+    }
+
+    private System.Windows.Forms.ContextMenuStrip? _trayContextMenu;
+
+    private void BuildTrayMenu(LocalizationService loc)
+    {
+        _trayContextMenu?.Dispose();
+        var contextMenu = new System.Windows.Forms.ContextMenuStrip();
+        contextMenu.Items.Add(loc.Get("Tray_Settings"), null, (_, _) => ShowSettingsWindow());
+        contextMenu.Items.Add("-");
+        contextMenu.Items.Add(loc.Get("Tray_About"), null, (_, _) =>
+            MessageBox.Show(
+                loc.Get("Tray_AboutText"),
+                "VerbaCore", MessageBoxButton.OK, MessageBoxImage.Information));
+        contextMenu.Items.Add("-");
+        contextMenu.Items.Add(loc.Get("Tray_Exit"), null, (_, _) => ExitApp());
+        _trayContextMenu = contextMenu;
     }
 
     private static Icon LoadTrayIcon()
     {
-        // For single-file publish, AppContext.BaseDirectory points to the temp extraction dir,
-        // not the actual install directory. Use the exe's real location instead.
-        var exePath = Environment.ProcessPath;
-        var exeDir = !string.IsNullOrEmpty(exePath)
-            ? System.IO.Path.GetDirectoryName(exePath)!
-            : AppContext.BaseDirectory;
-
-        // 1. Try .ico files first (native icon format, best quality)
-        var icoCandidates = new[]
+        // Load from the embedded WPF resource — works identically in dev, single-file publish, and installed builds.
+        try
         {
-            System.IO.Path.Combine(exeDir, "res", "icons", "verbacore.ico"),
-            System.IO.Path.Combine(AppContext.BaseDirectory, "res", "icons", "verbacore.ico"),
-            System.IO.Path.Combine(exeDir, "..", "..", "..", "..", "..", "res", "icons", "verbacore.ico"),
-        };
-
-        foreach (var path in icoCandidates)
-        {
-            if (!System.IO.File.Exists(path)) continue;
-            try { return new Icon(path, 32, 32); }
-            catch { /* fall through */ }
+            var uri = new Uri("pack://application:,,,/res/icons/verbacore.ico", UriKind.Absolute);
+            var info = Application.GetResourceStream(uri);
+            if (info?.Stream is { } stream)
+            {
+                using (stream)
+                {
+                    return new Icon(stream, 32, 32);
+                }
+            }
         }
-
-        // 2. Fall back to .png conversion
-        var pngCandidates = new[]
-        {
-            System.IO.Path.Combine(exeDir, "res", "icons", "verbacore.png"),
-            System.IO.Path.Combine(AppContext.BaseDirectory, "res", "icons", "verbacore.png"),
-            System.IO.Path.Combine(exeDir, "..", "..", "..", "..", "..", "res", "icons", "verbacore.png"),
-        };
-
-        foreach (var path in pngCandidates)
-        {
-            if (!System.IO.File.Exists(path)) continue;
-            using var bmp = new Bitmap(path);
-            var hIcon = bmp.GetHicon();
-            var icon = Icon.FromHandle(hIcon);
-            var cloned = (Icon)icon.Clone();
-            icon.Dispose();
-            Helpers.NativeMethods.DestroyIcon(hIcon);
-            return cloned;
-        }
+        catch { /* fall through */ }
 
         return SystemIcons.Application;
     }
@@ -198,6 +200,8 @@ public partial class App : Application
         _capsLockService = null;
         _trayIcon?.Dispose();
         _trayIcon = null;
+        _trayContextMenu?.Dispose();
+        _trayContextMenu = null;
         _overlayWindow?.CloseForShutdown();
         _settingsWindow?.Close();
         _singleInstanceMutex?.ReleaseMutex();

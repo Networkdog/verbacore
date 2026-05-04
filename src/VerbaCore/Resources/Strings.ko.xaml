@@ -1,0 +1,118 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=mscorlib">
+
+    <!-- Overlay -->
+    <sys:String x:Key="Overlay_Loading">조회 중...</sys:String>
+    <sys:String x:Key="Overlay_ModeDict">📖 사전</sys:String>
+    <sys:String x:Key="Overlay_ModeTrans">🔄 번역</sys:String>
+    <sys:String x:Key="Overlay_ModeAssist">💡 도우미</sys:String>
+    <sys:String x:Key="Overlay_HintModeSwitch">  ·  Tab: 모드 전환</sys:String>
+    <sys:String x:Key="Overlay_StatusDefault">CapsLock을 누른 채로 단어를 입력하세요</sys:String>
+    <sys:String x:Key="Overlay_StatusCopied">결과가 클립보드에 복사되었습니다</sys:String>
+    <sys:String x:Key="Overlay_StatusInputPrompt">단어를 입력하세요 — Enter: 조회, CapsLock: 닫기</sys:String>
+    <sys:String x:Key="Overlay_StatusDone">완료 — Ctrl+C: 복사 · Esc: 닫기</sys:String>
+    <sys:String x:Key="Overlay_StatusTimeout">시간 초과</sys:String>
+    <sys:String x:Key="Overlay_StatusError">오류 발생</sys:String>
+    <sys:String x:Key="Overlay_TimeoutMarkdown">## ⏰ 시간 초과
+
+응답 시간이 초과되었습니다. 다시 시도해주세요.</sys:String>
+    <sys:String x:Key="Overlay_ErrorMarkdown">## ❌ 오류
+
+{0}
+
+API Key와 설정을 확인해주세요.</sys:String>
+
+    <!-- Settings Window -->
+    <sys:String x:Key="Settings_Title">VerbaCore 설정</sys:String>
+    <sys:String x:Key="Settings_TabSettings">⚙ 설정</sys:String>
+    <sys:String x:Key="Settings_TabHistory">📋 히스토리</sys:String>
+
+    <!-- Settings View - API -->
+    <sys:String x:Key="Settings_ApiSection">API 설정</sys:String>
+    <sys:String x:Key="Settings_ApiProvider">API 제공자</sys:String>
+    <sys:String x:Key="Settings_Model">모델</sys:String>
+    <sys:String x:Key="Settings_ModelAzure">모델 (Deployment Name)</sys:String>
+    <sys:String x:Key="Settings_ModelHint">목록에서 선택하거나 직접 입력할 수 있습니다</sys:String>
+    <sys:String x:Key="Settings_ModelAzureHint">Azure OpenAI의 배포 이름을 입력하세요</sys:String>
+    <sys:String x:Key="Settings_ReasoningEffort">Reasoning Effort</sys:String>
+    <sys:String x:Key="Settings_ReasoningEffortHint">GPT-5, o1, o3 등 reasoning 모델에서 사고 수준 조절</sys:String>
+    <sys:String x:Key="Settings_AzureEndpoint">Azure Endpoint</sys:String>
+    <sys:String x:Key="Settings_AzureApiVersion">API 버전</sys:String>
+    <sys:String x:Key="Settings_CustomEndpoint">Custom Endpoint</sys:String>
+    <sys:String x:Key="Settings_CustomEndpointPlaceholder">http://localhost:11434 또는 https://your-server.com</sys:String>
+    <sys:String x:Key="Settings_CustomEndpointHint">OpenAI 호환 API 엔드포인트 (Ollama, LM Studio 등)</sys:String>
+
+    <!-- Settings View - Language -->
+    <sys:String x:Key="Settings_LanguageSection">언어 설정</sys:String>
+    <sys:String x:Key="Settings_NativeLanguage">모국어</sys:String>
+    <sys:String x:Key="Settings_NativeLanguageHint">해설과 번역 결과가 표시되는 언어</sys:String>
+    <sys:String x:Key="Settings_ForeignLanguage">외국어</sys:String>
+    <sys:String x:Key="Settings_ForeignLanguageHint">주로 학습하거나 번역할 대상 언어</sys:String>
+
+    <!-- Settings View - Input -->
+    <sys:String x:Key="Settings_InputSection">입력 설정</sys:String>
+    <sys:String x:Key="Settings_GlobalHotkey">글로벌 단축키</sys:String>
+    <sys:String x:Key="Settings_GlobalHotkeyHint">어디서나 단축키로 VerbaCore를 활성화합니다</sys:String>
+
+    <!-- Settings View - Appearance -->
+    <sys:String x:Key="Settings_AppearanceSection">외관</sys:String>
+    <sys:String x:Key="Settings_UiLanguage">UI 언어</sys:String>
+    <sys:String x:Key="Settings_UiLanguageHint">앱 인터페이스 표시 언어</sys:String>
+    <sys:String x:Key="Settings_Theme">테마</sys:String>
+    <sys:String x:Key="Settings_OverlayPosition">검색창 위치</sys:String>
+    <sys:String x:Key="Settings_OverlayPositionHint">검색창이 화면에 표시되는 위치</sys:String>
+    <sys:String x:Key="Settings_OverlaySize">검색창 크기</sys:String>
+    <sys:String x:Key="Settings_OverlaySizeHint">검색창의 기본 크기를 선택합니다</sys:String>
+
+    <!-- Settings View - System -->
+    <sys:String x:Key="Settings_SystemSection">시스템</sys:String>
+    <sys:String x:Key="Settings_StartWithWindows">Windows 시작 시 실행</sys:String>
+    <sys:String x:Key="Settings_StartWithWindowsHint">컴퓨터 시작 시 VerbaCore를 자동 실행합니다</sys:String>
+    <sys:String x:Key="Settings_SaveButton">설정 저장</sys:String>
+    <sys:String x:Key="Settings_SavedMessage">설정이 저장되었습니다.</sys:String>
+
+    <!-- Settings View - Positions -->
+    <sys:String x:Key="Position_TopLeft">왼쪽 위</sys:String>
+    <sys:String x:Key="Position_TopCenter">위 가운데</sys:String>
+    <sys:String x:Key="Position_TopRight">오른쪽 위</sys:String>
+    <sys:String x:Key="Position_CenterLeft">왼쪽 가운데</sys:String>
+    <sys:String x:Key="Position_Center">가운데</sys:String>
+    <sys:String x:Key="Position_CenterRight">오른쪽 가운데</sys:String>
+    <sys:String x:Key="Position_BottomLeft">왼쪽 아래</sys:String>
+    <sys:String x:Key="Position_BottomCenter">아래 가운데</sys:String>
+    <sys:String x:Key="Position_BottomRight">오른쪽 아래</sys:String>
+
+    <!-- Settings View - Sizes -->
+    <sys:String x:Key="Size_Small">작게</sys:String>
+    <sys:String x:Key="Size_Medium">중간</sys:String>
+    <sys:String x:Key="Size_Large">크게</sys:String>
+
+    <!-- History View -->
+    <sys:String x:Key="History_SearchPlaceholder">히스토리 검색...</sys:String>
+    <sys:String x:Key="History_ClearAll">전체 삭제</sys:String>
+    <sys:String x:Key="History_Requery">다시 조회</sys:String>
+    <sys:String x:Key="History_CopyResult">결과 복사</sys:String>
+    <sys:String x:Key="History_Delete">삭제</sys:String>
+    <sys:String x:Key="History_Empty">조회 기록이 없습니다</sys:String>
+
+    <!-- Tray -->
+    <sys:String x:Key="Tray_Settings">⚙ 설정</sys:String>
+    <sys:String x:Key="Tray_About">VerbaCore 정보</sys:String>
+    <sys:String x:Key="Tray_Exit">종료</sys:String>
+    <sys:String x:Key="Tray_Tooltip">VerbaCore — CapsLock으로 AI 사전/번역</sys:String>
+    <sys:String x:Key="Tray_AlreadyRunning">VerbaCore가 이미 실행 중입니다.</sys:String>
+    <sys:String x:Key="Tray_AboutText">VerbaCore — 경량 AI 사전 &amp; 번역
+
+CapsLock을 누른 채로 단어를 입력하세요.
+CapsLock을 떼면 AI가 결과를 표시합니다.
+
+Tab: 모드 전환 (사전/번역)
+Esc: 취소
+Backspace: 글자 삭제</sys:String>
+
+    <!-- Azure key placeholder -->
+    <sys:String x:Key="AzureKeyPlaceholder_True">Azure API Key</sys:String>
+    <sys:String x:Key="AzureKeyPlaceholder_False">sk-...</sys:String>
+
+</ResourceDictionary>

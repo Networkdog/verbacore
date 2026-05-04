@@ -28,7 +28,7 @@ public partial class OverlayWindow : Window
     private DateTime _lastRenderTime = DateTime.MinValue;
     private const int RenderThrottleMs = 200;
 
-    // Cached FlowDocument/Run for plain-text streaming — avoids creating new objects every 200ms
+    // Cached FlowDocument/Run for plain-text streaming ??avoids creating new objects every 200ms
     private Run? _streamingRun;
     private FlowDocument? _streamingDoc;
 
@@ -46,6 +46,8 @@ public partial class OverlayWindow : Window
     private string? _grabbedSelectedText;
     /// <summary>True while an API lookup is actively streaming.</summary>
     private bool _isLookupInProgress;
+    /// <summary>The most recent input that was looked up, so Tab can re-run with a new mode.</summary>
+    private string? _lastLookupInput;
     // Global mouse hook to detect clicks outside the overlay
     private IntPtr _mouseHookId = IntPtr.Zero;
     private NativeMethods.LowLevelMouseProc? _mouseHookProc;
@@ -132,6 +134,8 @@ public partial class OverlayWindow : Window
                 _userExplicitlySetMode = true;
                 UpdateModeLabel();
                 AnimateModeLabelSwitch();
+                // Re-run the last lookup with the newly selected mode
+                RerunLastLookupOnModeChange();
                 e.Handled = true;
                 return;
             }
@@ -158,7 +162,7 @@ public partial class OverlayWindow : Window
                     {
                         try { System.Windows.Clipboard.SetText(text); }
                         catch (System.Runtime.InteropServices.ExternalException) { }
-                        StatusLabel.Text = "결과가 클립보드에 복사되었습니다";
+                        StatusLabel.Text = Loc("Overlay_StatusCopied");
                     }
                     e.Handled = true;
                 }
@@ -212,7 +216,24 @@ public partial class OverlayWindow : Window
             _userExplicitlySetMode = true;
             UpdateModeLabel();
             AnimateModeLabelSwitch();
+            // Re-run the last lookup with the newly selected mode
+            RerunLastLookupOnModeChange();
         }
+    }
+
+    /// <summary>
+    /// If a previous lookup result is on screen, re-run it with the current mode
+    /// so switching mode via Tab actually updates the result.
+    /// </summary>
+    private void RerunLastLookupOnModeChange()
+    {
+        if (string.IsNullOrEmpty(_lastLookupInput)) return;
+        if (_isLookupInProgress)
+        {
+            _cts?.Cancel();
+            _isLookupInProgress = false;
+        }
+        SafePerformLookup(_lastLookupInput);
     }
 
     private void OnCapsLockPressed(object? sender, EventArgs e)
@@ -251,12 +272,12 @@ public partial class OverlayWindow : Window
             StopLoadingSpinner();
             BlinkingCursor.Visibility = Visibility.Visible;
             HintLabel.Visibility = Visibility.Visible;
-            StatusLabel.Text = "CapsLock을 누른 채로 단어를 입력하세요";
+            StatusLabel.Text = Loc("Overlay_StatusDefault");
 
             UpdateModeLabel();
             UpdateCursorPosition();
 
-            // Show overlay (Enso-style hold mode for now — may become persistent on quick tap)
+            // Show overlay (Enso-style hold mode for now ??may become persistent on quick tap)
             if (!_isShown)
             {
                 ShowOverlay();
@@ -275,7 +296,7 @@ public partial class OverlayWindow : Window
         {
             if (_isShown && !_justOpened)
             {
-                // Overlay was already showing before this CapsLock press — close it
+                // Overlay was already showing before this CapsLock press ??close it
                 _capsLockService.PersistentModeActive = false;
                 _persistentMode = false;
                 _cursorBlinkStoryboard?.Stop();
@@ -284,9 +305,9 @@ public partial class OverlayWindow : Window
             else
             {
                 _justOpened = false;
-                // First quick tap — enter persistent mode with IME TextBox
+                // First quick tap ??enter persistent mode with IME TextBox
                 _persistentMode = true;
-                _capsLockService.PersistentModeActive = false; // Don't intercept keys — let TextBox handle them
+                _capsLockService.PersistentModeActive = false; // Don't intercept keys ??let TextBox handle them
 
                 // Switch to TextBox UI
                 InputDisplay.Text = "";
@@ -314,9 +335,9 @@ public partial class OverlayWindow : Window
                 }
                 else
                 {
-                    StatusLabel.Text = "단어를 입력하세요 — Enter: 조회, CapsLock: 닫기";
+                    StatusLabel.Text = Loc("Overlay_StatusInputPrompt");
 
-                    // Focus the TextBox for IME input — use ForceActivate to steal focus from other apps
+                    // Focus the TextBox for IME input ??use ForceActivate to steal focus from other apps
                     ForceActivate();
                     Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Input, () =>
                     {
@@ -330,7 +351,7 @@ public partial class OverlayWindow : Window
     }
 
     /// <summary>
-    /// Long press: CapsLock held ≥0.5s or typed while held.
+    /// Long press: CapsLock held ??.5s or typed while held.
     /// Perform lookup (if there's input) and auto-hide.
     /// </summary>
     private void OnLongPressReleased(object? sender, EventArgs e)
@@ -360,7 +381,7 @@ public partial class OverlayWindow : Window
     }
 
     /// <summary>
-    /// Enter pressed in persistent mode (from keyboard hook) — trigger lookup.
+    /// Enter pressed in persistent mode (from keyboard hook) ??trigger lookup.
     /// </summary>
     private void OnEnterPressed(object? sender, EventArgs e)
     {
@@ -393,7 +414,7 @@ public partial class OverlayWindow : Window
     {
         Dispatcher.Invoke(() =>
         {
-            // Check for Tab (mode switch) — handle before display
+            // Check for Tab (mode switch) ??handle before display
             if (buffer.EndsWith('\t'))
             {
                 _modeIndex = (_modeIndex + 1) % _modes.Length;
@@ -413,14 +434,17 @@ public partial class OverlayWindow : Window
         });
     }
 
+    private static string Loc(string key) =>
+        Application.Current.TryFindResource(key) as string ?? key;
+
     private void UpdateModeLabel()
     {
         ModeLabel.Text = _currentMode switch
         {
-            LookupMode.Dictionary => "📖 사전",
-            LookupMode.Translate => "🔄 번역",
-            LookupMode.Assist => "💡 도우미",
-            _ => "📖 사전"
+            LookupMode.Dictionary => Loc("Overlay_ModeDict"),
+            LookupMode.Translate => Loc("Overlay_ModeTrans"),
+            LookupMode.Assist => Loc("Overlay_ModeAssist"),
+            _ => Loc("Overlay_ModeDict")
         };
     }
 
@@ -502,10 +526,12 @@ public partial class OverlayWindow : Window
 
         if (string.IsNullOrEmpty(_settingsService.Current.ApiKey))
         {
-            StatusLabel.Text = "⚠ API Key가 설정되지 않았습니다. 트레이 아이콘 → 설정";
+            StatusLabel.Text = "??API Key가 ?�정?��? ?�았?�니?? ?�레???�이�????�정";
             _autoHideTimer.Start();
             return;
         }
+
+        _lastLookupInput = input;
 
         // Auto-select mode based on input length if user hasn't explicitly switched
         if (!_userExplicitlySetMode)
@@ -531,7 +557,7 @@ public partial class OverlayWindow : Window
         _streamingRun = null;
         _streamingDoc = null;
 
-        // Compact input display for Translate/Assist modes (long text → shrink to summary)
+        // Compact input display for Translate/Assist modes (long text ??shrink to summary)
         // Dictionary mode keeps the original large word display
         if (_currentMode is LookupMode.Translate or LookupMode.Assist)
             CompactInputDisplay(input);
@@ -574,7 +600,7 @@ public partial class OverlayWindow : Window
             // Final render with full Markdown formatting
             RenderMarkdown(sb.ToString());
 
-            StatusLabel.Text = "완료 — Ctrl+C: 복사 · Esc: 닫기";
+            StatusLabel.Text = Loc("Overlay_StatusDone");
 
             // Save to history
             await _historyService.AddAsync(new LookupHistoryItem
@@ -593,8 +619,8 @@ public partial class OverlayWindow : Window
         {
             StopLoadingSpinner();
             ShowResultViewer();
-            RenderMarkdown("## \u23f0 시간 초과\n\n응답 시간이 초과되었습니다. 다시 시도해주세요.");
-            StatusLabel.Text = "시간 초과";
+            RenderMarkdown(Loc("Overlay_TimeoutMarkdown"));
+            StatusLabel.Text = Loc("Overlay_StatusTimeout");
             _autoHideTimer.Start();
         }
         catch (OperationCanceledException)
@@ -606,8 +632,8 @@ public partial class OverlayWindow : Window
         {
             StopLoadingSpinner();
             ShowResultViewer();
-            RenderMarkdown($"## \u274c 오류\n\n{ex.Message}\n\nAPI Key와 설정을 확인해주세요.");
-            StatusLabel.Text = "오류 발생";
+            RenderMarkdown(string.Format(Loc("Overlay_ErrorMarkdown"), ex.Message));
+            StatusLabel.Text = Loc("Overlay_StatusError");
             _autoHideTimer.Start();
         }
         finally
@@ -786,6 +812,7 @@ public partial class OverlayWindow : Window
         _isShown = false;
         _persistentMode = false;
         _userExplicitlySetMode = false;
+        _lastLookupInput = null;
         _capsLockService.PersistentModeActive = false;
         UninstallMouseHook();
 
@@ -853,7 +880,7 @@ public partial class OverlayWindow : Window
         Close();
     }
 
-    #region Global Mouse Hook — click-outside detection
+    #region Global Mouse Hook ??click-outside detection
 
     private void InstallMouseHook()
     {
@@ -886,7 +913,7 @@ public partial class OverlayWindow : Window
                     && NativeMethods.GetWindowRect(hwnd, out var rect)
                     && !PtInRect(rect, hookData.pt))
                 {
-                    // Click was outside the overlay — hide it on the UI thread
+                    // Click was outside the overlay ??hide it on the UI thread
                     Dispatcher.BeginInvoke(() =>
                     {
                         if (_isShown)
@@ -1007,7 +1034,7 @@ public partial class OverlayWindow : Window
         }
         else if (block is System.Windows.Documents.Section section)
         {
-            // Blockquotes — left accent border + subtle background
+            // Blockquotes ??left accent border + subtle background
             section.Background = BlockquoteBgBrush;
             section.BorderBrush = BlockquoteBorderBrush;
             section.BorderThickness = new Thickness(3, 0, 0, 0);
