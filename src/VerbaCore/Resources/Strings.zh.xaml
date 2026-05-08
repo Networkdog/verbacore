@@ -139,5 +139,6 @@ Backspace: 删除字符</sys:String>
     <sys:String x:Key="Settings_CacheEntryCount">已存储项目:</sys:String>
     <sys:String x:Key="Settings_ClearCache">清空缓存</sys:String>
     <sys:String x:Key="Overlay_StatusCached">已从缓存加载</sys:String>
+    <sys:String x:Key="Overlay_IgnoreCacheAndRetry">忽略缓存并重查</sys:String>
 
 </ResourceDictionary>

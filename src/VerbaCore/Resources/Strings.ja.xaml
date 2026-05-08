@@ -139,5 +139,6 @@ Backspace: 文字削除</sys:String>
     <sys:String x:Key="Settings_CacheEntryCount">保存済み項目:</sys:String>
     <sys:String x:Key="Settings_ClearCache">キャッシュを削除</sys:String>
     <sys:String x:Key="Overlay_StatusCached">キャッシュから読み込みました</sys:String>
+    <sys:String x:Key="Overlay_IgnoreCacheAndRetry">キャッシュ無視で再検索</sys:String>
 
 </ResourceDictionary>

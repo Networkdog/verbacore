@@ -189,14 +189,32 @@
                                    x:Name="HintLabel" />
                     </StackPanel>
 
-                    <TextBlock Grid.Column="1"
-                               x:Name="StatusLabel"
-                               Text="{DynamicResource Overlay_StatusDefault}"
-                               FontSize="13"
-                               FontFamily="{StaticResource AppUIFont}"
-                               Foreground="#40FFFFFF"
-                               HorizontalAlignment="Right"
-                               VerticalAlignment="Center" />
+                    <StackPanel Grid.Column="1"
+                                Orientation="Horizontal"
+                                HorizontalAlignment="Right"
+                                VerticalAlignment="Center">
+                        <TextBlock x:Name="StatusLabel"
+                                   Text="{DynamicResource Overlay_StatusDefault}"
+                                   FontSize="13"
+                                   FontFamily="{StaticResource AppUIFont}"
+                                   Foreground="#40FFFFFF"
+                                   VerticalAlignment="Center" />
+
+                        <Button x:Name="IgnoreCacheButton"
+                                Content="{DynamicResource Overlay_IgnoreCacheAndRetry}"
+                                Visibility="Collapsed"
+                                Click="OnIgnoreCacheButtonClick"
+                                Margin="8,0,0,0"
+                                Padding="10,2"
+                                FontSize="12"
+                                FontFamily="{StaticResource AppUIFont}"
+                                Foreground="#D0FFFFFF"
+                                Background="#30FFFFFF"
+                                BorderBrush="#50FFFFFF"
+                                BorderThickness="1"
+                                Cursor="Hand"
+                                VerticalAlignment="Center" />
+                    </StackPanel>
                 </Grid>
             </Grid>
             </Border>

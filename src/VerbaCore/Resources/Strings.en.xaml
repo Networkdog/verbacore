@@ -139,5 +139,6 @@ Download and install now?</sys:String>
     <sys:String x:Key="Settings_CacheEntryCount">Stored entries:</sys:String>
     <sys:String x:Key="Settings_ClearCache">Clear cache</sys:String>
     <sys:String x:Key="Overlay_StatusCached">Loaded from cache</sys:String>
+    <sys:String x:Key="Overlay_IgnoreCacheAndRetry">Ignore cache and retry</sys:String>
 
 </ResourceDictionary>

@@ -139,5 +139,6 @@ Backspace: 글자 삭제</sys:String>
     <sys:String x:Key="Settings_CacheEntryCount">저장된 항목:</sys:String>
     <sys:String x:Key="Settings_ClearCache">캐시 비우기</sys:String>
     <sys:String x:Key="Overlay_StatusCached">캐시에서 불러옴</sys:String>
+    <sys:String x:Key="Overlay_IgnoreCacheAndRetry">캐시 무시 후 재검색</sys:String>
 
 </ResourceDictionary>

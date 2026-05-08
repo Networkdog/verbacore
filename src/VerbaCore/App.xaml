@@ -28,7 +28,7 @@
 
             <!-- Override Markdig.Wpf code styles: remove light gray background that
                  makes white text unreadable on the dark overlay. -->
-            <Style x:Key="{x:Static markdig:Styles.CodeStyleKey}" TargetType="{x:Type Span}">
+            <Style x:Key="{x:Static markdig:Styles.CodeStyleKey}" TargetType="{x:Type Inline}">
                 <Setter Property="FontFamily" Value="{StaticResource AppCodeFont}" />
                 <Setter Property="Background" Value="Transparent" />
                 <Setter Property="Foreground" Value="#FFE6B85C" />
