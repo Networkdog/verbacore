@@ -49,7 +49,7 @@ src/VerbaCore/
 
 ## Coding Conventions
 - Use `file-scoped namespaces`
-- Use `primary constructors` where appropriate
+- Use `primary constructors` for classes whose only constructor sets readonly fields via DI injection (e.g., services). Do not use them for classes with non-trivial constructor logic
 - `CommunityToolkit.Mvvm` attributes: `[ObservableProperty]`, `[RelayCommand]`
 - `System.Text.Json` serialization — **always use source generation contexts** (`SettingsJsonContext`, `HistoryJsonContext`, `ApiJsonContext`)
 - All async methods must accept `CancellationToken`
@@ -89,12 +89,16 @@ When code changes, update these documents accordingly:
 - **`README.md`**: Features, Project Structure, Tech Stack sections
 - **`.github/skills/glossary/SKILL.md`**: Element Glossary (when adding/removing/renaming elements)
 
-Specifically:
-1. New file/service added → update Project Structure
-2. New NuGet package → update Tech Stack
-3. New performance optimization → update Performance Patterns
-4. New UI element/shortcut/mode → update SKILL.md Glossary
-5. Feature added/removed → update README.md Features
+Look up the row matching your change, then update only the sections named in each column (— means no update needed for that document):
+
+| Change trigger | copilot-instructions.md (this file) | README.md | SKILL.md (glossary) |
+|----------------|-------------------------------------|-----------|---------------------|
+| New file/service added | Project Structure | Project Structure | — |
+| File/service removed or renamed | Project Structure | Project Structure | Element Glossary |
+| New NuGet package | Tech Stack | Tech Stack | — |
+| New performance optimization | Performance Patterns | — | — |
+| New UI element/shortcut/mode | — | — | Element Glossary |
+| Feature added/removed | — | Features | — |
 
 ## Important Notes
 - `UseWindowsForms=true` — for NotifyIcon; `GlobalUsings.cs` resolves WPF/WinForms conflicts
