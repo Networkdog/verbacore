@@ -15,6 +15,9 @@ public sealed class CapsLockService : IDisposable
 
     private IntPtr _hookId = IntPtr.Zero;
     private NativeMethods.LowLevelKeyboardProc? _hookProc;
+    private Thread? _hookThread;
+    private uint _hookThreadId;
+    private readonly ManualResetEventSlim _hookInstalled = new(false);
     private bool _capsDown;
     private string _buffer = string.Empty;
     private long _capsDownTimestamp;
@@ -55,6 +58,34 @@ public sealed class CapsLockService : IDisposable
 
     public void Install()
     {
+        if (_hookThread is not null)
+            return;
+
+        // Run the low-level keyboard hook on a dedicated thread with its own
+        // message loop. This is the critical fix for CapsLock leaking through:
+        // WH_KEYBOARD_LL is dispatched on the thread that installed it, so if it
+        // lived on the UI thread, any slow UI work (first overlay render, UIA
+        // text grab) would stall the hook callback past Windows'
+        // LowLevelHooksTimeout (~300ms) and the OS would pass CapsLock through,
+        // toggling the caps state. A dedicated pump thread is never blocked by
+        // UI work, so the callback always returns in time and CapsLock is
+        // reliably suppressed.
+        _hookThread = new Thread(HookThreadProc)
+        {
+            IsBackground = true,
+            Name = "VerbaCore.KeyboardHook"
+        };
+        _hookThread.SetApartmentState(ApartmentState.STA);
+        _hookThread.Start();
+
+        // Block briefly until the hook is actually installed so the caller can
+        // rely on interception being active on return.
+        _hookInstalled.Wait(2000);
+    }
+
+    private void HookThreadProc()
+    {
+        _hookThreadId = NativeMethods.GetCurrentThreadId();
         _hookProc = HookCallback;
         _hookId = NativeMethods.SetWindowsHookEx(
             NativeMethods.WH_KEYBOARD_LL,
@@ -62,9 +93,25 @@ public sealed class CapsLockService : IDisposable
             NativeMethods.CachedModuleHandle,
             0);
 
-        // Force CapsLock OFF after hook is installed
-        // The hook filters injected keys, so this simulated press will pass through
+        // Force CapsLock OFF after hook is installed.
+        // The hook filters injected keys, so this simulated press passes through.
         NativeMethods.ToggleCapsLockOff();
+
+        _hookInstalled.Set();
+
+        // Dedicated message pump — required for WH_KEYBOARD_LL delivery.
+        while (NativeMethods.GetMessage(out var msg, IntPtr.Zero, 0, 0) > 0)
+        {
+            NativeMethods.TranslateMessage(ref msg);
+            NativeMethods.DispatchMessage(ref msg);
+        }
+
+        // Loop exited (WM_QUIT) — unhook on the same thread that installed it.
+        if (_hookId != IntPtr.Zero)
+        {
+            NativeMethods.UnhookWindowsHookEx(_hookId);
+            _hookId = IntPtr.Zero;
+        }
     }
 
     public void ClearBuffer()
@@ -310,10 +357,25 @@ public sealed class CapsLockService : IDisposable
 
     public void Dispose()
     {
+        // Ask the hook thread's message loop to exit; it unhooks on its own thread.
+        var threadId = _hookThreadId;
+        if (threadId != 0)
+            NativeMethods.PostThreadMessage(threadId, NativeMethods.WM_QUIT, IntPtr.Zero, IntPtr.Zero);
+
+        if (_hookThread is not null)
+        {
+            _hookThread.Join(1000);
+            _hookThread = null;
+        }
+        _hookThreadId = 0;
+
+        // Fallback: ensure the hook is removed even if the thread didn't run.
         if (_hookId != IntPtr.Zero)
         {
             NativeMethods.UnhookWindowsHookEx(_hookId);
             _hookId = IntPtr.Zero;
         }
+
+        _hookInstalled.Dispose();
     }
 }

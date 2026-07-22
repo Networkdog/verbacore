@@ -33,14 +33,14 @@ src/VerbaCore/
 │   ├── Strings.ko.xaml        — Korean UI string resources
 │   └── Strings.en.xaml        — English UI string resources
 ├── Services/
-│   ├── CapsLockService.cs     — Low-level keyboard hook, EnsoHold/QuickTap detection
+│   ├── CapsLockService.cs     — Low-level keyboard hook on a dedicated message-pump thread, EnsoHold/QuickTap detection
 │   ├── OpenAiService.cs       — 6-provider SSE streaming + Utf8JsonReader parsing
 │   ├── PromptBuilder.cs       — Mode-specific prompt generation + AutoMode selection
 │   ├── SettingsService.cs     — JSON settings load/save + DPAPI (source-generated)
 │   ├── HistoryService.cs      — JSON history + debounced save (source-generated)
 │   ├── HotkeyService.cs       — NHotkey global hotkey registration/unregistration
 │   ├── LocalizationService.cs — Runtime UI language switching via ResourceDictionary swap
-│   └── CursorTextService.cs   — COM UIA3 selected text extraction
+    └── CursorTextService.cs   — COM UIA3 selected text extraction (+ startup WarmUp)
 └── Helpers/
     ├── NativeMethods.cs       — Win32 P/Invoke + CachedModuleHandle
     ├── UIA3Interop.cs         — COM UIA3 interface definitions
@@ -58,16 +58,18 @@ src/VerbaCore/
 
 ## Performance Patterns
 - **JSON source generation**: All Settings/History/API DTOs use `JsonSerializerContext` — eliminates reflection
-- **Streaming FlowDocument reuse**: `_streamingRun`/`_streamingDoc` caching prevents new WPF object creation every 200ms
+- **Live Markdown streaming**: results render as formatted Markdown *during* streaming (throttled to 200ms via `RenderThrottleMs`), not just at the end; `RenderMarkdown` also unwraps an outer ` ```markdown ` fence that some models (gpt-5.x) wrap the whole answer in. `_streamingRun`/`_streamingDoc` caching backs the plain-text fallback (`RenderPlainText`)
 - **SSE Utf8JsonReader**: Zero-alloc `Utf8JsonReader` instead of `JsonDocument` for streaming JSON parsing
 - **Cursor animation GPU acceleration**: WPF Storyboard on composition thread instead of DispatcherTimer
 - **Module handle caching**: `NativeMethods.CachedModuleHandle` avoids Process allocation on every hook install
+- **Dedicated keyboard-hook thread**: `WH_KEYBOARD_LL` runs on its own message-pump thread, so the hook callback is never stalled by UI work and always returns within the OS `LowLevelHooksTimeout` (~300ms) — CapsLock is reliably suppressed even while the overlay/UIA initialize on first use (prevents caps-mode toggling)
+- **Startup pre-warm**: overlay visual tree is pre-rendered off-screen (`OverlayWindow.PrimeRender`) and the UIA client is warmed up (`CursorTextService.WarmUp`) during startup idle, so the first CapsLock activation pops up instantly instead of paying one-time init costs on the critical path
 - **History debounced save**: 500ms debounce on consecutive lookups to minimize I/O
 - **ListBox virtualization**: `VirtualizingPanel.VirtualizationMode="Recycling"` enabled
 - **PublishReadyToRun**: AOT precompilation on publish builds
 
 ## Key Architecture Decisions
-1. **CapsLock quasimodal**: `SetWindowsHookEx` WH_KEYBOARD_LL intercepts CapsLock. EnsoHold(≥0.5s) vs QuickTap(<0.5s) distinction
+1. **CapsLock quasimodal**: `SetWindowsHookEx` WH_KEYBOARD_LL intercepts CapsLock on a **dedicated message-pump thread** (never blocked by UI work → reliable suppression, no caps toggling). EnsoHold(≥0.5s) vs QuickTap(<0.5s) distinction
 2. **6-provider SSE**: HttpClient + `ResponseHeadersRead` + `StreamReader` → `Utf8JsonReader` chunk parsing
 3. **3 Lookup Modes**: Dictionary(≤3 words), Translate(>3 words), Assist(code/URL/formula/non-language) — `PromptBuilder.AutoSelectMode()` auto-selects
 4. **Overlay**: Transparent `Window` + `AllowsTransparency="True"`. 220ms fade in / 180ms fade out. Global mouse hook for outside-click detection

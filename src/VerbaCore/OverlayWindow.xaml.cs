@@ -241,7 +241,10 @@ public partial class OverlayWindow : Window
 
     private void OnCapsLockPressed(object? sender, EventArgs e)
     {
-        Dispatcher.Invoke(() =>
+        // BeginInvoke (not Invoke): the hook now runs on a dedicated thread, so this
+        // must not block it. Returning immediately lets the hook suppress CapsLock
+        // within the OS timeout regardless of how long the UI work below takes.
+        Dispatcher.BeginInvoke(() =>
         {
             // If overlay is already showing, mark that we did NOT just open it
             // (so quick-tap release will close it)
@@ -295,7 +298,7 @@ public partial class OverlayWindow : Window
     /// </summary>
     private void OnQuickTapReleased(object? sender, EventArgs e)
     {
-        Dispatcher.Invoke(() =>
+        Dispatcher.BeginInvoke(() =>
         {
             if (_isShown && !_justOpened)
             {
@@ -359,7 +362,7 @@ public partial class OverlayWindow : Window
     /// </summary>
     private void OnLongPressReleased(object? sender, EventArgs e)
     {
-        Dispatcher.Invoke(() =>
+        Dispatcher.BeginInvoke(() =>
         {
             _persistentMode = false;
             _capsLockService.PersistentModeActive = false;
@@ -388,7 +391,7 @@ public partial class OverlayWindow : Window
     /// </summary>
     private void OnEnterPressed(object? sender, EventArgs e)
     {
-        Dispatcher.Invoke(() =>
+        Dispatcher.BeginInvoke(() =>
         {
             // In persistent mode we use the TextBox, so read from it
             if (_persistentMode)
@@ -415,7 +418,7 @@ public partial class OverlayWindow : Window
 
     private void OnBufferChanged(object? sender, string buffer)
     {
-        Dispatcher.Invoke(() =>
+        Dispatcher.BeginInvoke(() =>
         {
             // Check for Tab (mode switch) ??handle before display
             if (buffer.EndsWith('\t'))
@@ -560,10 +563,9 @@ public partial class OverlayWindow : Window
         _streamingRun = null;
         _streamingDoc = null;
 
-        // Compact input display for Translate/Assist modes (long text ??shrink to summary)
-        // Dictionary mode keeps the original large word display
-        if (_currentMode is LookupMode.Translate or LookupMode.Assist)
-            CompactInputDisplay(input);
+        // Keep the input text visible during the loading phase so it never disappears
+        // mid-lookup. The input is compacted (for Translate/Assist modes) only once the
+        // result is ready to render (see the cache-hit and first-chunk paths below).
 
         // Show loading indicator until first chunk arrives
         ResultViewer.Visibility = Visibility.Collapsed;
@@ -583,6 +585,8 @@ public partial class OverlayWindow : Window
         if (_settingsService.Current.EnableLookupCache && _cacheService.TryGet(cacheKey, out var cachedResponse))
         {
             StopLoadingSpinner();
+            if (_currentMode is LookupMode.Translate or LookupMode.Assist)
+                CompactInputDisplay(input);
             ShowResultViewer();
             RenderMarkdown(cachedResponse);
             StatusLabel.Text = Loc("Overlay_StatusCached");
@@ -606,6 +610,8 @@ public partial class OverlayWindow : Window
                 {
                     firstChunk = false;
                     StopLoadingSpinner();
+                    if (_currentMode is LookupMode.Translate or LookupMode.Assist)
+                        CompactInputDisplay(input);
                     ShowResultViewer();
                 }
                 sb.Append(chunk);
@@ -615,7 +621,8 @@ public partial class OverlayWindow : Window
                 if ((now - _lastRenderTime).TotalMilliseconds >= RenderThrottleMs)
                 {
                     _lastRenderTime = now;
-                    RenderPlainText(sb.ToString());
+                    // Render formatted Markdown live during streaming (not raw source).
+                    RenderMarkdown(sb.ToString());
                     await Task.Yield(); // Release UI thread to paint
                 }
             }
@@ -749,6 +756,35 @@ public partial class OverlayWindow : Window
         }
 
         Activate();
+    }
+
+    /// <summary>
+    /// Forces WPF to build and render the overlay's visual tree once, off-screen and
+    /// without activation, so the first real <see cref="ShowOverlay"/> appears instantly
+    /// instead of paying the one-time layout/render cost on the critical path.
+    /// Called once at startup during idle time.
+    /// </summary>
+    public void PrimeRender()
+    {
+        if (_isShown || IsVisible) return;
+        try
+        {
+            ShowActivated = false;   // don't steal focus from the user's current app
+            Left = -10000;
+            Top = -10000;
+            Opacity = 0;
+            Show();
+            UpdateLayout();          // force a synchronous measure/arrange pass
+            Hide();
+            Opacity = 0;
+            Left = -9999;
+            Top = -9999;
+            ShowActivated = true;    // restore normal activation for real shows
+        }
+        catch
+        {
+            // Priming is best-effort; a failure here must never affect startup.
+        }
     }
 
     private void ShowOverlay()
@@ -963,7 +999,7 @@ public partial class OverlayWindow : Window
 
         try
         {
-            var doc = Markdig.Wpf.Markdown.ToFlowDocument(markdown, MarkdownPipeline);
+            var doc = Markdig.Wpf.Markdown.ToFlowDocument(NormalizeMarkdown(markdown), MarkdownPipeline);
             ApplyDarkThemeToDocument(doc);
             ResultViewer.Document = doc;
         }
@@ -971,6 +1007,40 @@ public partial class OverlayWindow : Window
         {
             RenderPlainText(markdown);
         }
+    }
+
+    /// <summary>
+    /// Some models (e.g. gpt-5.x) wrap their entire answer in a fenced code block
+    /// (```markdown ... ``` or even a bare ``` ... ```), which Markdig renders as a
+    /// literal code block — so the user sees raw source instead of a formatted document.
+    /// If the whole response parses to a single code block, unwrap it. Real language
+    /// blocks (```python, ```json, ...) are left intact so Assist-mode code still renders
+    /// as code. Works mid-stream too: an unclosed fence parses as a code block to end.
+    /// </summary>
+    private static string NormalizeMarkdown(string markdown)
+    {
+        if (string.IsNullOrEmpty(markdown)) return markdown;
+
+        try
+        {
+            var parsed = Markdig.Markdown.Parse(markdown, MarkdownPipeline);
+            if (parsed.Count == 1 && parsed[0] is Markdig.Syntax.CodeBlock cb)
+            {
+                var info = (cb as Markdig.Syntax.FencedCodeBlock)?.Info;
+                if (string.IsNullOrEmpty(info)
+                    || info.Equals("markdown", StringComparison.OrdinalIgnoreCase)
+                    || info.Equals("md", StringComparison.OrdinalIgnoreCase))
+                {
+                    return cb.Lines.ToString();
+                }
+            }
+        }
+        catch
+        {
+            // On any parse issue, fall through and render the original markdown as-is.
+        }
+
+        return markdown;
     }
 
     /// <summary>
