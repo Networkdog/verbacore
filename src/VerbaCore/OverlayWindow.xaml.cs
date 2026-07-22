@@ -49,6 +49,8 @@ public partial class OverlayWindow : Window
     private bool _isLookupInProgress;
     /// <summary>The most recent input that was looked up, so Tab can re-run with a new mode.</summary>
     private string? _lastLookupInput;
+    /// <summary>When true, skip cache lookup for the next request only.</summary>
+    private bool _ignoreCacheForNextLookup;
     // Global mouse hook to detect clicks outside the overlay
     private IntPtr _mouseHookId = IntPtr.Zero;
     private NativeMethods.LowLevelMouseProc? _mouseHookProc;
@@ -166,6 +168,7 @@ public partial class OverlayWindow : Window
                         try { System.Windows.Clipboard.SetText(text); }
                         catch (System.Runtime.InteropServices.ExternalException) { }
                         StatusLabel.Text = Loc("Overlay_StatusCopied");
+                        SetIgnoreCacheButtonVisible(false);
                     }
                     e.Handled = true;
                 }
@@ -279,6 +282,7 @@ public partial class OverlayWindow : Window
             BlinkingCursor.Visibility = Visibility.Visible;
             HintLabel.Visibility = Visibility.Visible;
             StatusLabel.Text = Loc("Overlay_StatusDefault");
+            SetIgnoreCacheButtonVisible(false);
 
             UpdateModeLabel();
             UpdateCursorPosition();
@@ -342,6 +346,7 @@ public partial class OverlayWindow : Window
                 else
                 {
                     StatusLabel.Text = Loc("Overlay_StatusInputPrompt");
+                    SetIgnoreCacheButtonVisible(false);
 
                     // Focus the TextBox for IME input ??use ForceActivate to steal focus from other apps
                     ForceActivate();
@@ -443,6 +448,22 @@ public partial class OverlayWindow : Window
     private static string Loc(string key) =>
         Application.Current.TryFindResource(key) as string ?? key;
 
+    private void SetIgnoreCacheButtonVisible(bool visible)
+    {
+        IgnoreCacheButton.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private void OnIgnoreCacheButtonClick(object sender, RoutedEventArgs e)
+    {
+        if (_isLookupInProgress || string.IsNullOrWhiteSpace(_lastLookupInput))
+            return;
+
+        _ignoreCacheForNextLookup = true;
+        SetIgnoreCacheButtonVisible(false);
+        StatusLabel.Text = Loc("Overlay_Loading");
+        SafePerformLookup(_lastLookupInput);
+    }
+
     private void UpdateModeLabel()
     {
         ModeLabel.Text = _currentMode switch
@@ -533,6 +554,7 @@ public partial class OverlayWindow : Window
         if (string.IsNullOrEmpty(_settingsService.Current.ApiKey))
         {
             StatusLabel.Text = "??API Key가 ?�정?��? ?�았?�니?? ?�레???�이�????�정";
+            SetIgnoreCacheButtonVisible(false);
             _autoHideTimer.Start();
             return;
         }
@@ -573,16 +595,19 @@ public partial class OverlayWindow : Window
         var spinnerStoryboard = (Storyboard)LoadingPanel.FindResource("SpinnerStoryboard");
         spinnerStoryboard.Begin(LoadingPanel, true);
         StatusLabel.Text = "";
+        SetIgnoreCacheButtonVisible(false);
 
         var src = _settingsService.Current.NativeLanguage;
         var tgt = _settingsService.Current.ForeignLanguage;
+        var bypassCache = _ignoreCacheForNextLookup;
+        _ignoreCacheForNextLookup = false;
 
         // Cache lookup — short-circuit before consuming LLM tokens
         var cacheKey = LookupCacheService.MakeKey(
             _settingsService.Current.Provider.ToString(),
             _settingsService.Current.Model,
             _currentMode, src, tgt, input);
-        if (_settingsService.Current.EnableLookupCache && _cacheService.TryGet(cacheKey, out var cachedResponse))
+        if (_settingsService.Current.EnableLookupCache && !bypassCache && _cacheService.TryGet(cacheKey, out var cachedResponse))
         {
             StopLoadingSpinner();
             if (_currentMode is LookupMode.Translate or LookupMode.Assist)
@@ -590,6 +615,7 @@ public partial class OverlayWindow : Window
             ShowResultViewer();
             RenderMarkdown(cachedResponse);
             StatusLabel.Text = Loc("Overlay_StatusCached");
+            SetIgnoreCacheButtonVisible(true);
             await _historyService.AddAsync(new LookupHistoryItem
             {
                 Input = input
@@ -631,6 +657,7 @@ public partial class OverlayWindow : Window
             RenderMarkdown(sb.ToString());
 
             StatusLabel.Text = Loc("Overlay_StatusDone");
+            SetIgnoreCacheButtonVisible(false);
 
             // Cache successful response (skip empty)
             if (_settingsService.Current.EnableLookupCache && sb.Length > 0)
@@ -653,6 +680,7 @@ public partial class OverlayWindow : Window
             ShowResultViewer();
             RenderMarkdown(Loc("Overlay_TimeoutMarkdown"));
             StatusLabel.Text = Loc("Overlay_StatusTimeout");
+            SetIgnoreCacheButtonVisible(false);
             _autoHideTimer.Start();
         }
         catch (OperationCanceledException)
@@ -666,6 +694,7 @@ public partial class OverlayWindow : Window
             ShowResultViewer();
             RenderMarkdown(string.Format(Loc("Overlay_ErrorMarkdown"), ex.Message));
             StatusLabel.Text = Loc("Overlay_StatusError");
+            SetIgnoreCacheButtonVisible(false);
             _autoHideTimer.Start();
         }
         finally
@@ -874,8 +903,10 @@ public partial class OverlayWindow : Window
         _persistentMode = false;
         _userExplicitlySetMode = false;
         _lastLookupInput = null;
+        _ignoreCacheForNextLookup = false;
         _capsLockService.PersistentModeActive = false;
         UninstallMouseHook();
+        SetIgnoreCacheButtonVisible(false);
 
         // Reset TextBox/TextBlock visibility
         InputTextBox.Visibility = Visibility.Collapsed;
@@ -999,12 +1030,23 @@ public partial class OverlayWindow : Window
 
         try
         {
+            // Explicitly clear the previous document before rebuilding.
+            ResultViewer.Document = null;
+
             var doc = Markdig.Wpf.Markdown.ToFlowDocument(NormalizeMarkdown(markdown), MarkdownPipeline);
+            if (doc == null)
+            {
+                // Fall back to plain text if Markdown conversion yields nothing.
+                RenderPlainText(markdown);
+                return;
+            }
+
             ApplyDarkThemeToDocument(doc);
             ResultViewer.Document = doc;
         }
-        catch
+        catch (Exception ex)
         {
+            System.Diagnostics.Debug.WriteLine($"[OverlayWindow] Markdown rendering failed: {ex.Message}");
             RenderPlainText(markdown);
         }
     }
@@ -1056,8 +1098,8 @@ public partial class OverlayWindow : Window
             return;
         }
 
-        _streamingRun = new Run(text);
-        var para = new Paragraph(_streamingRun);
+        _streamingRun = new Run(text) { Foreground = TextBrush };
+        var para = new Paragraph(_streamingRun) { Margin = new Thickness(0) };
         _streamingDoc = new FlowDocument(para)
         {
             Foreground = TextBrush,
