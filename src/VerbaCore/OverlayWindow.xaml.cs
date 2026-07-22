@@ -1033,7 +1033,15 @@ public partial class OverlayWindow : Window
             // Explicitly clear the previous document before rebuilding.
             ResultViewer.Document = null;
 
-            var doc = Markdig.Wpf.Markdown.ToFlowDocument(NormalizeMarkdown(markdown), MarkdownPipeline);
+            var normalized = NormalizeMarkdown(markdown);
+
+            // In Dictionary mode the looked-up word is already shown large in InputDisplay,
+            // so drop a leading heading that merely echoes it — otherwise the same word
+            // appears twice and wastes vertical space for the actual content.
+            if (_currentMode == LookupMode.Dictionary)
+                normalized = StripEchoedTitle(normalized, _lastLookupInput);
+
+            var doc = Markdig.Wpf.Markdown.ToFlowDocument(normalized, MarkdownPipeline);
             if (doc == null)
             {
                 // Fall back to plain text if Markdown conversion yields nothing.
@@ -1083,6 +1091,84 @@ public partial class OverlayWindow : Window
         }
 
         return markdown;
+    }
+
+    /// <summary>
+    /// Dictionary-mode responses sometimes lead with a heading (or lone emphasized line)
+    /// that just repeats the looked-up word — e.g. <c>## intrusion</c>. That word is
+    /// already displayed prominently in <see cref="InputDisplay"/>, so the echoed title
+    /// is redundant and steals content space. If the first non-empty line resolves to the
+    /// same word, remove it (plus the following blank line). A heading that is only a
+    /// prefix of the word is also stripped so it never flickers into view mid-stream.
+    /// </summary>
+    private static string StripEchoedTitle(string markdown, string? inputWord)
+    {
+        if (string.IsNullOrEmpty(markdown) || string.IsNullOrWhiteSpace(inputWord))
+            return markdown;
+
+        var targetWord = NormalizeForTitleMatch(inputWord);
+        if (targetWord.Length == 0) return markdown;
+
+        var lineStart = 0;
+        while (lineStart < markdown.Length)
+        {
+            var lineEnd = markdown.IndexOf('\n', lineStart);
+            if (lineEnd < 0) lineEnd = markdown.Length;
+            var line = markdown[lineStart..lineEnd];
+
+            // Skip leading blank lines.
+            if (line.Trim().Length == 0)
+            {
+                lineStart = lineEnd + 1;
+                continue;
+            }
+
+            var normalizedLine = NormalizeForTitleMatch(line);
+            var isHeading = line.TrimStart().StartsWith('#');
+            var echoesWord = normalizedLine.Length > 0
+                && (normalizedLine == targetWord
+                    // Mid-stream a heading arrives character-by-character (e.g. "## intr");
+                    // treat any heading that is a prefix of the word as the echoed title.
+                    || (isHeading && targetWord.StartsWith(normalizedLine, StringComparison.Ordinal)));
+
+            if (!echoesWord) return markdown; // Real content — leave it untouched.
+
+            // Drop the echoed line and any blank line(s) immediately after it.
+            var rest = lineEnd < markdown.Length ? lineEnd + 1 : markdown.Length;
+            while (rest < markdown.Length && (markdown[rest] == '\n' || markdown[rest] == '\r'))
+                rest++;
+            return markdown[rest..];
+        }
+
+        return markdown;
+    }
+
+    /// <summary>
+    /// Reduces a candidate title line and the input word to a comparable form by dropping
+    /// markdown markers (<c>#</c>, <c>*</c>, <c>_</c>, <c>`</c>, <c>~</c>), whitespace, and
+    /// surrounding punctuation, then lower-casing. Both sides use the same normalization so
+    /// comparisons stay symmetric regardless of how the model wrapped the word.
+    /// </summary>
+    private static string NormalizeForTitleMatch(string text)
+    {
+        if (string.IsNullOrEmpty(text)) return string.Empty;
+
+        var buffer = new char[text.Length];
+        var n = 0;
+        foreach (var ch in text)
+        {
+            if (ch is '#' or '*' or '_' or '`' or '~' || char.IsWhiteSpace(ch)) continue;
+            buffer[n++] = char.ToLowerInvariant(ch);
+        }
+
+        static bool IsTrimPunct(char c) =>
+            c is '.' or ',' or ':' or ';' or '!' or '?' or '"' or '\'' or '“' or '”'
+              or '(' or ')' or '[' or ']' or '-';
+
+        int start = 0, end = n;
+        while (start < end && IsTrimPunct(buffer[start])) start++;
+        while (end > start && IsTrimPunct(buffer[end - 1])) end--;
+        return new string(buffer, start, end - start);
     }
 
     /// <summary>
