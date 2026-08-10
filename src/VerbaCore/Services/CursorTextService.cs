@@ -89,34 +89,6 @@ public sealed class CursorTextService : IDisposable
     }
 
     /// <summary>
-    /// Pre-warms the UIA client so the first real <see cref="GetSelectedText"/> call does
-    /// not pay the (multi-second) one-time COM/accessibility initialization cost on the
-    /// critical path when the user first presses CapsLock. Best-effort; safe to call once
-    /// at startup on the same (UI) thread that later calls <see cref="GetSelectedText"/>.
-    /// </summary>
-    public void WarmUp()
-    {
-        try
-        {
-            var fg = NativeMethods.GetForegroundWindow();
-            if (fg != IntPtr.Zero)
-            {
-                var root = _uia.ElementFromHandle(fg);
-                if (root != null)
-                    _ = TryGetSelectionText(root);
-            }
-
-            var focused = _uia.GetFocusedElement();
-            if (focused != null)
-                _ = TryGetSelectionText(focused);
-        }
-        catch
-        {
-            // Warm-up is best-effort; ignore any failure.
-        }
-    }
-
-    /// <summary>
     /// Gets the currently selected (highlighted) text from the focused application
     /// using COM UIA3 TextPattern. Works with native apps, browsers, and Electron/Chromium.
     /// Does not use the clipboard. Automation-thread only.

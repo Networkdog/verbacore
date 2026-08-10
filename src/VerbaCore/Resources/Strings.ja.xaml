@@ -14,6 +14,7 @@
     <sys:String x:Key="Overlay_StatusDone">完了 — Ctrl+C: コピー · Esc: 閉じる</sys:String>
     <sys:String x:Key="Overlay_StatusTimeout">タイムアウト</sys:String>
     <sys:String x:Key="Overlay_StatusError">エラーが発生しました</sys:String>
+    <sys:String x:Key="Overlay_StatusNoApiKey">⚠️ API Key が設定されていません — トレイアイコン → 設定</sys:String>
     <sys:String x:Key="Overlay_TimeoutMarkdown">## ⏰ タイムアウト
 
 リクエストがタイムアウトしました。もう一度お試しください。</sys:String>

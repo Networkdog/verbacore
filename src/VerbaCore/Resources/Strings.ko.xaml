@@ -14,6 +14,7 @@
     <sys:String x:Key="Overlay_StatusDone">완료 — Ctrl+C: 복사 · Esc: 닫기</sys:String>
     <sys:String x:Key="Overlay_StatusTimeout">시간 초과</sys:String>
     <sys:String x:Key="Overlay_StatusError">오류 발생</sys:String>
+    <sys:String x:Key="Overlay_StatusNoApiKey">⚠️ API Key가 설정되지 않았습니다 — 트레이 아이콘 → 설정</sys:String>
     <sys:String x:Key="Overlay_TimeoutMarkdown">## ⏰ 시간 초과
 
 응답 시간이 초과되었습니다. 다시 시도해주세요.</sys:String>

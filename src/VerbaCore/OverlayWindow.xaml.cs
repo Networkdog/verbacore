@@ -355,22 +355,25 @@ public partial class OverlayWindow : Window
     /// </summary>
     private void OnQuickTapReleased(object? sender, EventArgs e)
     {
-        Dispatcher.Invoke(() =>
+        Dispatcher.BeginInvoke(() => _ = HandleQuickTapReleasedAsync());
+    }
+
+    private async Task HandleQuickTapReleasedAsync()
+    {
+        if (_isShown && !_justOpened)
         {
-            if (_isShown && !_justOpened)
-            {
-                // Overlay was already showing before this CapsLock press ??close it
-                _capsLockService.PersistentModeActive = false;
-                _persistentMode = false;
-                _cursorBlinkStoryboard?.Stop();
-                HideOverlay();
-            }
-            else
-            {
-                _justOpened = false;
-                // First quick tap ??enter persistent mode with IME TextBox
-                _persistentMode = true;
-                _capsLockService.PersistentModeActive = false; // Don't intercept keys ??let TextBox handle them
+            // Overlay was already showing before this CapsLock press — close it
+            _capsLockService.PersistentModeActive = false;
+            _persistentMode = false;
+            _cursorBlinkStoryboard?.Stop();
+            HideOverlay();
+            return;
+        }
+
+        _justOpened = false;
+        // First quick tap — enter persistent mode with IME TextBox
+        _persistentMode = true;
+        _capsLockService.PersistentModeActive = false; // Don't intercept keys — let TextBox handle them
 
         // Switch to TextBox UI
         InputDisplay.Text = "";
@@ -427,13 +430,16 @@ public partial class OverlayWindow : Window
     /// </summary>
     private void OnLongPressReleased(object? sender, EventArgs e)
     {
-        Dispatcher.Invoke(() =>
-        {
-            _persistentMode = false;
-            _capsLockService.PersistentModeActive = false;
-            _cursorBlinkStoryboard?.Stop();
-            BlinkingCursor.Visibility = Visibility.Collapsed;
-            HintLabel.Visibility = Visibility.Collapsed;
+        Dispatcher.BeginInvoke(() => _ = HandleLongPressReleasedAsync());
+    }
+
+    private async Task HandleLongPressReleasedAsync()
+    {
+        _persistentMode = false;
+        _capsLockService.PersistentModeActive = false;
+        _cursorBlinkStoryboard?.Stop();
+        BlinkingCursor.Visibility = Visibility.Collapsed;
+        HintLabel.Visibility = Visibility.Collapsed;
 
         var session = _selectedTextSession;
         var input = _capsLockService.Buffer.Trim();
@@ -609,7 +615,7 @@ public partial class OverlayWindow : Window
 
         if (string.IsNullOrEmpty(_settingsService.Current.ApiKey))
         {
-            StatusLabel.Text = "??API Key가 ?�정?��? ?�았?�니?? ?�레???�이�????�정";
+            StatusLabel.Text = Loc("Overlay_StatusNoApiKey");
             SetIgnoreCacheButtonVisible(false);
             _autoHideTimer.Start();
             return;
@@ -841,6 +847,24 @@ public partial class OverlayWindow : Window
         }
 
         Activate();
+    }
+
+    /// <summary>
+    /// Realizes the HWND and runs one render pass off-screen so the first real activation
+    /// isn't slowed down by WPF's cold-start cost.
+    /// </summary>
+    public void PreWarm()
+    {
+        Left = -32000;
+        Top = -32000;
+        Opacity = 0;
+        ShowActivated = false; // don't steal focus from whatever the user is doing at startup
+        Show();
+        Dispatcher.BeginInvoke(DispatcherPriority.ContextIdle, () =>
+        {
+            if (!_isShown) Hide();
+            ShowActivated = true;
+        });
     }
 
     private void ShowOverlay()

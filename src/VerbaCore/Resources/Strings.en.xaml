@@ -14,6 +14,7 @@
     <sys:String x:Key="Overlay_StatusDone">Done — Ctrl+C: Copy · Esc: Close</sys:String>
     <sys:String x:Key="Overlay_StatusTimeout">Timed out</sys:String>
     <sys:String x:Key="Overlay_StatusError">Error occurred</sys:String>
+    <sys:String x:Key="Overlay_StatusNoApiKey">⚠️ API Key is not set — Tray icon → Settings</sys:String>
     <sys:String x:Key="Overlay_TimeoutMarkdown">## ⏰ Timed Out
 
 The request timed out. Please try again.</sys:String>

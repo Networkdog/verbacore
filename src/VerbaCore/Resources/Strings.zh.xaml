@@ -14,6 +14,7 @@
     <sys:String x:Key="Overlay_StatusDone">完成 — Ctrl+C: 复制 · Esc: 关闭</sys:String>
     <sys:String x:Key="Overlay_StatusTimeout">已超时</sys:String>
     <sys:String x:Key="Overlay_StatusError">发生错误</sys:String>
+    <sys:String x:Key="Overlay_StatusNoApiKey">⚠️ 未设置 API Key — 托盘图标 → 设置</sys:String>
     <sys:String x:Key="Overlay_TimeoutMarkdown">## ⏰ 已超时
 
 请求已超时，请重试。</sys:String>
