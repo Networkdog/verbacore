@@ -72,11 +72,7 @@ src/VerbaCore/
 - **PublishReadyToRun**: AOT precompilation on publish builds
 
 ## Key Architecture Decisions
-<<<<<<< HEAD
-1. **CapsLock quasimodal**: `SetWindowsHookEx` WH_KEYBOARD_LL intercepts CapsLock from a dedicated hook thread. EnsoHold(≥0.5s) vs QuickTap(<0.5s) distinction. Tab raises `ModeSwitchRequested` instead of round-tripping through the buffer
-=======
-1. **CapsLock quasimodal**: `SetWindowsHookEx` WH_KEYBOARD_LL intercepts CapsLock on a **dedicated message-pump thread** (never blocked by UI work → reliable suppression, no caps toggling). EnsoHold(≥0.5s) vs QuickTap(<0.5s) distinction
->>>>>>> 70dc8dd2581e07f4d0c6e5c8799e13ad061ce4d3
+1. **CapsLock quasimodal**: `SetWindowsHookEx` WH_KEYBOARD_LL intercepts CapsLock on a **dedicated message-pump thread** (never blocked by UI work → reliable suppression, no caps toggling). EnsoHold(≥0.5s) vs QuickTap(<0.5s) distinction. Tab raises `ModeSwitchRequested` instead of round-tripping through the buffer
 2. **6-provider SSE**: HttpClient + `ResponseHeadersRead` + `StreamReader` → `Utf8JsonReader` chunk parsing
 3. **3 Lookup Modes**: Dictionary(≤3 words), Translate(>3 words), Assist(code/URL/formula/non-language) — `PromptBuilder.AutoSelectMode()` auto-selects
 4. **Overlay**: Transparent `Window` + `AllowsTransparency="True"`. 220ms fade in / 180ms fade out. Global mouse hook for outside-click detection
