@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Runtime.InteropServices;
 using VerbaCore.Helpers;
 
@@ -8,16 +9,91 @@ namespace VerbaCore.Services;
 /// The managed System.Windows.Automation uses UIA2, which Chromium/Electron
 /// does not support for TextPattern. COM UIA3 is the API used by NVDA and FlaUI.
 /// </summary>
-public sealed class CursorTextService
+/// <remarks>
+/// All automation calls run on a dedicated STA thread. They are cross-process and can take
+/// hundreds of milliseconds, which would blow past the 300 ms low-level keyboard hook
+/// timeout if executed on the hook or UI thread. The IUIAutomation object is created on
+/// that thread too, so calls stay in-apartment instead of marshalling back to the UI thread.
+/// </remarks>
+public sealed class CursorTextService : IDisposable
 {
-    private readonly IUIAutomation _uia = UIA3.CreateAutomation();
+    private readonly BlockingCollection<Action> _queue = new();
+    private readonly Thread _worker;
+    private IUIAutomation _uia = null!;
+    private long _requestSeq;
+
+    public CursorTextService()
+    {
+        _worker = new Thread(WorkerMain)
+        {
+            IsBackground = true,
+            Name = "VerbaCore.Uia"
+        };
+        _worker.SetApartmentState(ApartmentState.STA);
+        _worker.Start();
+    }
+
+    private void WorkerMain()
+    {
+        _uia = UIA3.CreateAutomation();
+        foreach (var work in _queue.GetConsumingEnumerable())
+        {
+            try { work(); }
+            catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[CursorTextService] {ex}"); }
+        }
+    }
+
+    /// <summary>
+    /// Queues a selected-text lookup on the automation thread. <paramref name="foregroundWindow"/>
+    /// is the window captured before the overlay stole focus; pass <see cref="IntPtr.Zero"/> to
+    /// resolve it at call time.
+    /// </summary>
+    public Task<string?> GetSelectedTextAsync(IntPtr foregroundWindow, CancellationToken ct)
+    {
+        var seq = Interlocked.Increment(ref _requestSeq);
+        var tcs = new TaskCompletionSource<string?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        try
+        {
+            _queue.Add(() =>
+            {
+                // Drop stale requests so rapid CapsLock presses don't queue up behind a
+                // slow lookup of a window the user has already moved on from.
+                if (ct.IsCancellationRequested || Interlocked.Read(ref _requestSeq) != seq)
+                    tcs.TrySetResult(null);
+                else
+                    tcs.TrySetResult(GetSelectedText(foregroundWindow));
+            }, ct);
+        }
+        catch (Exception)
+        {
+            tcs.TrySetResult(null);
+        }
+        return tcs.Task;
+    }
+
+    /// <summary>
+    /// Warms up the automation stack so the first real lookup after a long idle period
+    /// does not pay COM/accessibility initialization cost.
+    /// </summary>
+    public void PreWarm()
+    {
+        try
+        {
+            _queue.Add(() =>
+            {
+                try { _ = _uia.GetFocusedElement(); }
+                catch (COMException) { }
+            });
+        }
+        catch (Exception) { /* queue already completed */ }
+    }
 
     /// <summary>
     /// Gets the currently selected (highlighted) text from the focused application
     /// using COM UIA3 TextPattern. Works with native apps, browsers, and Electron/Chromium.
-    /// Does not use the clipboard.
+    /// Does not use the clipboard. Automation-thread only.
     /// </summary>
-    public string? GetSelectedText()
+    private string? GetSelectedText(IntPtr foregroundWindow)
     {
         try
         {
@@ -28,20 +104,22 @@ public sealed class CursorTextService
             IUIAutomationElement? hwndRoot = null;
             try
             {
-                var fgHwnd = NativeMethods.GetForegroundWindow();
+                var fgHwnd = foregroundWindow != IntPtr.Zero
+                    ? foregroundWindow
+                    : NativeMethods.GetForegroundWindow();
                 if (fgHwnd != IntPtr.Zero)
                     hwndRoot = _uia.ElementFromHandle(fgHwnd);
             }
             catch (COMException) { /* tolerate */ }
 
-            // 2) Fast path: focused element + its ancestors.
+            // 2) Fast path: focused element + its ancestors. This runs before the overlay
+            //    has taken focus in practice, since the grab is queued at CapsLock-down.
             var text = TryFocusedAndAncestors();
             if (text != null) return text;
 
-            // 3) Chromium often exposes TextPattern on a Document descendant of
-            //    the window root rather than an ancestor of the focused element.
-            //    Search the window root's subtree for any element with a non-empty
-            //    selection.
+            // 3) Chromium often exposes TextPattern on a Document descendant of the window
+            //    root rather than an ancestor of the focused element. The captured handle
+            //    still points at the original app even once the overlay owns focus.
             if (hwndRoot != null)
             {
                 text = SearchDescendants(hwndRoot, depth: 0, maxDepth: 8, siblingBudget: 64);
@@ -184,5 +262,12 @@ public sealed class CursorTextService
         {
             return null;
         }
+    }
+
+    public void Dispose()
+    {
+        _queue.CompleteAdding();
+        _worker.Join(TimeSpan.FromSeconds(2));
+        _queue.Dispose();
     }
 }

@@ -45,6 +45,12 @@ public partial class OverlayWindow : Window
     private bool _justOpened;
     /// <summary>Selected text grabbed from the focused app when CapsLock was pressed.</summary>
     private string? _grabbedSelectedText;
+    /// <summary>In-flight UIA selection grab for the current overlay session.</summary>
+    private Task<string?>? _selectedTextTask;
+    /// <summary>Incremented per overlay session so a late UIA result can be discarded.</summary>
+    private int _selectedTextSession;
+    /// <summary>Longest we wait for the UIA grab before showing/looking up without it.</summary>
+    private const int SelectionGrabTimeoutMs = 800;
     /// <summary>True while an API lookup is actively streaming.</summary>
     private bool _isLookupInProgress;
     /// <summary>The most recent input that was looked up, so Tab can re-run with a new mode.</summary>
@@ -127,6 +133,7 @@ public partial class OverlayWindow : Window
         _capsLockService.LongPressReleased += OnLongPressReleased;
         _capsLockService.BufferChanged += OnBufferChanged;
         _capsLockService.EnterPressed += OnEnterPressed;
+        _capsLockService.ModeSwitchRequested += OnModeSwitchRequested;
 
         // Handle Tab key for mode switching (in the keyboard hook)
         PreviewKeyDown += (_, e) =>
@@ -244,7 +251,13 @@ public partial class OverlayWindow : Window
 
     private void OnCapsLockPressed(object? sender, EventArgs e)
     {
-        Dispatcher.Invoke(() =>
+        // Runs on the keyboard hook thread. Only enqueue work here: if this callback takes
+        // longer than LowLevelHooksTimeout (300 ms) Windows drops the hook for this event
+        // and CapsLock just toggles case instead of opening the overlay.
+        var grabTask = _cursorTextService.GetSelectedTextAsync(
+            _capsLockService.ForegroundWindowAtPress, CancellationToken.None);
+
+        Dispatcher.BeginInvoke(() =>
         {
             // If overlay is already showing, mark that we did NOT just open it
             // (so quick-tap release will close it)
@@ -259,11 +272,12 @@ public partial class OverlayWindow : Window
             _cts?.Cancel();
             _autoHideTimer.Stop();
 
-            // Grab selected text from the previously focused app BEFORE we steal focus
-            _grabbedSelectedText = _cursorTextService.GetSelectedText();
+            var session = ++_selectedTextSession;
+            _grabbedSelectedText = null;
+            _selectedTextTask = grabTask;
 
             // Reset UI for new input
-            InputDisplay.Text = _grabbedSelectedText ?? "";
+            InputDisplay.Text = "";
             InputDisplay.FontWeight = FontWeights.Light;
             InputDisplay.Foreground = WhiteBrush;
             InputDisplay.TextWrapping = TextWrapping.Wrap;
@@ -284,12 +298,54 @@ public partial class OverlayWindow : Window
             UpdateModeLabel();
             UpdateCursorPosition();
 
-            // Show overlay (Enso-style hold mode for now ??may become persistent on quick tap)
+            // Show overlay (Enso-style hold mode for now — may become persistent on quick tap)
             if (!_isShown)
             {
                 ShowOverlay();
             }
             _cursorBlinkStoryboard?.Begin();
+
+            _ = ShowGrabbedSelectionAsync(grabTask, session);
+        });
+    }
+
+    /// <summary>
+    /// Waits for the selection grab kicked off at CapsLock-down and previews it in the
+    /// hold-mode input line, unless the user has already typed something.
+    /// </summary>
+    private async Task ShowGrabbedSelectionAsync(Task<string?> grabTask, int session)
+    {
+        var text = await AwaitSelectionAsync(grabTask);
+        if (session != _selectedTextSession) return;
+
+        _grabbedSelectedText = text;
+
+        if (string.IsNullOrEmpty(text) || !_isShown || _persistentMode) return;
+        if (_capsLockService.TypedWhileHeld || _capsLockService.Buffer.Length > 0) return;
+        if (ResultViewer.Visibility == Visibility.Visible) return;
+
+        InputDisplay.Text = text;
+        AdjustInputFontSize(text);
+        UpdateCursorPosition();
+    }
+
+    /// <summary>Bounded wait so a slow or unresponsive app can't stall the overlay.</summary>
+    private static async Task<string?> AwaitSelectionAsync(Task<string?> grabTask)
+    {
+        var finished = await Task.WhenAny(grabTask, Task.Delay(SelectionGrabTimeoutMs));
+        return finished == grabTask ? await grabTask : null;
+    }
+
+    private void OnModeSwitchRequested(object? sender, EventArgs e)
+    {
+        Dispatcher.BeginInvoke(() =>
+        {
+            _modeIndex = (_modeIndex + 1) % _modes.Length;
+            _currentMode = _modes[_modeIndex];
+            _userExplicitlySetMode = true;
+            UpdateModeLabel();
+            AnimateModeLabelSwitch();
+            RerunLastLookupOnModeChange();
         });
     }
 
@@ -299,93 +355,116 @@ public partial class OverlayWindow : Window
     /// </summary>
     private void OnQuickTapReleased(object? sender, EventArgs e)
     {
-        Dispatcher.Invoke(() =>
+        Dispatcher.BeginInvoke(() => _ = HandleQuickTapReleasedAsync());
+    }
+
+    private async Task HandleQuickTapReleasedAsync()
+    {
+        if (_isShown && !_justOpened)
         {
-            if (_isShown && !_justOpened)
-            {
-                // Overlay was already showing before this CapsLock press ??close it
-                _capsLockService.PersistentModeActive = false;
-                _persistentMode = false;
-                _cursorBlinkStoryboard?.Stop();
-                HideOverlay();
-            }
-            else
-            {
-                _justOpened = false;
-                // First quick tap ??enter persistent mode with IME TextBox
-                _persistentMode = true;
-                _capsLockService.PersistentModeActive = false; // Don't intercept keys ??let TextBox handle them
+            // Overlay was already showing before this CapsLock press — close it
+            _capsLockService.PersistentModeActive = false;
+            _persistentMode = false;
+            _cursorBlinkStoryboard?.Stop();
+            HideOverlay();
+            return;
+        }
 
-                // Switch to TextBox UI
-                InputDisplay.Text = "";
-                InputDisplay.Visibility = Visibility.Collapsed;
-                InputTextBox.Text = _grabbedSelectedText ?? "";
-                AdjustInputFontSize(InputTextBox.Text);
-                InputTextBox.Visibility = Visibility.Visible;
-                BlinkingCursor.Visibility = Visibility.Collapsed;
-                ResultViewer.Document = new FlowDocument();
-                ResultViewer.Visibility = Visibility.Collapsed;
-                StopLoadingSpinner();
-                HintLabel.Visibility = Visibility.Visible;
-                UpdateModeLabel();
+        _justOpened = false;
+        // First quick tap — enter persistent mode with IME TextBox
+        _persistentMode = true;
+        _capsLockService.PersistentModeActive = false; // Don't intercept keys — let TextBox handle them
 
-                if (!_isShown)
-                {
-                    ShowOverlay();
-                }
+        // Switch to TextBox UI
+        InputDisplay.Text = "";
+        InputDisplay.Visibility = Visibility.Collapsed;
+        InputTextBox.Text = "";
+        AdjustInputFontSize(InputTextBox.Text);
+        InputTextBox.Visibility = Visibility.Visible;
+        BlinkingCursor.Visibility = Visibility.Collapsed;
+        ResultViewer.Document = new FlowDocument();
+        ResultViewer.Visibility = Visibility.Collapsed;
+        StopLoadingSpinner();
+        HintLabel.Visibility = Visibility.Visible;
+        UpdateModeLabel();
 
-                // If we grabbed selected text, auto-trigger lookup immediately
-                if (!string.IsNullOrWhiteSpace(_grabbedSelectedText))
-                {
-                    HintLabel.Visibility = Visibility.Collapsed;
-                    SafePerformLookup(_grabbedSelectedText.Trim());
-                }
-                else
-                {
-                    StatusLabel.Text = Loc("Overlay_StatusInputPrompt");
-                    SetIgnoreCacheButtonVisible(false);
+        if (!_isShown)
+        {
+            ShowOverlay();
+        }
 
-                    // Focus the TextBox for IME input ??use ForceActivate to steal focus from other apps
-                    ForceActivate();
-                    Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Input, () =>
-                    {
-                        ForceActivate();
-                        InputTextBox.Focus();
-                        System.Windows.Input.Keyboard.Focus(InputTextBox);
-                    });
-                }
-            }
+        StatusLabel.Text = Loc("Overlay_StatusInputPrompt");
+        SetIgnoreCacheButtonVisible(false);
+
+        // Focus the TextBox for IME input — use ForceActivate to steal focus from other apps
+        ForceActivate();
+        await Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Input, () =>
+        {
+            ForceActivate();
+            InputTextBox.Focus();
+            System.Windows.Input.Keyboard.Focus(InputTextBox);
         });
+
+        // The selection grab started at CapsLock-down; auto-run it once it lands.
+        var session = _selectedTextSession;
+        var grabTask = _selectedTextTask;
+        if (grabTask is null) return;
+
+        var selected = await AwaitSelectionAsync(grabTask);
+        if (session != _selectedTextSession) return;
+
+        _grabbedSelectedText = selected;
+        if (string.IsNullOrWhiteSpace(selected)) return;
+        if (!_isShown || !_persistentMode) return;
+        if (InputTextBox.Text.Length > 0) return; // user already started typing
+
+        InputTextBox.Text = selected;
+        AdjustInputFontSize(selected);
+        HintLabel.Visibility = Visibility.Collapsed;
+        SafePerformLookup(selected.Trim());
     }
 
     /// <summary>
-    /// Long press: CapsLock held ??.5s or typed while held.
+    /// Long press: CapsLock held ≥0.5s or typed while held.
     /// Perform lookup (if there's input) and auto-hide.
     /// </summary>
     private void OnLongPressReleased(object? sender, EventArgs e)
     {
-        Dispatcher.Invoke(() =>
+        Dispatcher.BeginInvoke(() => _ = HandleLongPressReleasedAsync());
+    }
+
+    private async Task HandleLongPressReleasedAsync()
+    {
+        _persistentMode = false;
+        _capsLockService.PersistentModeActive = false;
+        _cursorBlinkStoryboard?.Stop();
+        BlinkingCursor.Visibility = Visibility.Collapsed;
+        HintLabel.Visibility = Visibility.Collapsed;
+
+        var session = _selectedTextSession;
+        var input = _capsLockService.Buffer.Trim();
+
+        // If no typed input, fall back to the selected text grabbed at CapsLock-down
+        if (string.IsNullOrEmpty(input))
         {
-            _persistentMode = false;
-            _capsLockService.PersistentModeActive = false;
-            _cursorBlinkStoryboard?.Stop();
-            BlinkingCursor.Visibility = Visibility.Collapsed;
-            HintLabel.Visibility = Visibility.Collapsed;
-
-            var input = _capsLockService.Buffer.Trim();
-            // If no typed input, fall back to grabbed selected text
-            if (string.IsNullOrEmpty(input))
-                input = _grabbedSelectedText?.Trim() ?? string.Empty;
-
-            if (string.IsNullOrEmpty(input))
+            var grabTask = _selectedTextTask;
+            if (grabTask is not null)
             {
-                HideOverlay();
-                return;
+                var selected = await AwaitSelectionAsync(grabTask);
+                if (session != _selectedTextSession) return;
+                _grabbedSelectedText = selected;
             }
+            input = _grabbedSelectedText?.Trim() ?? string.Empty;
+        }
 
-            // Trigger lookup
-            SafePerformLookup(input);
-        });
+        if (string.IsNullOrEmpty(input))
+        {
+            HideOverlay();
+            return;
+        }
+
+        // Trigger lookup
+        SafePerformLookup(input);
     }
 
     /// <summary>
@@ -393,7 +472,7 @@ public partial class OverlayWindow : Window
     /// </summary>
     private void OnEnterPressed(object? sender, EventArgs e)
     {
-        Dispatcher.Invoke(() =>
+        Dispatcher.BeginInvoke(() =>
         {
             // In persistent mode we use the TextBox, so read from it
             if (_persistentMode)
@@ -420,22 +499,8 @@ public partial class OverlayWindow : Window
 
     private void OnBufferChanged(object? sender, string buffer)
     {
-        Dispatcher.Invoke(() =>
+        Dispatcher.BeginInvoke(() =>
         {
-            // Check for Tab (mode switch) ??handle before display
-            if (buffer.EndsWith('\t'))
-            {
-                _modeIndex = (_modeIndex + 1) % _modes.Length;
-                _currentMode = _modes[_modeIndex];
-                _userExplicitlySetMode = true;
-                UpdateModeLabel();
-                AnimateModeLabelSwitch();
-                // Remove tab from buffer, preserving any text typed before it
-                var cleaned = buffer.TrimEnd('\t');
-                _capsLockService.SetBuffer(cleaned);
-                return;
-            }
-
             InputDisplay.Text = buffer;
             AdjustInputFontSize(buffer);
             UpdateCursorPosition();
@@ -780,6 +845,24 @@ public partial class OverlayWindow : Window
         Activate();
     }
 
+    /// <summary>
+    /// Realizes the HWND and runs one render pass off-screen so the first real activation
+    /// isn't slowed down by WPF's cold-start cost.
+    /// </summary>
+    public void PreWarm()
+    {
+        Left = -32000;
+        Top = -32000;
+        Opacity = 0;
+        ShowActivated = false; // don't steal focus from whatever the user is doing at startup
+        Show();
+        Dispatcher.BeginInvoke(DispatcherPriority.ContextIdle, () =>
+        {
+            if (!_isShown) Hide();
+            ShowActivated = true;
+        });
+    }
+
     private void ShowOverlay()
     {
         var workArea = SystemParameters.WorkArea;
@@ -932,6 +1015,7 @@ public partial class OverlayWindow : Window
         _capsLockService.LongPressReleased -= OnLongPressReleased;
         _capsLockService.BufferChanged -= OnBufferChanged;
         _capsLockService.EnterPressed -= OnEnterPressed;
+        _capsLockService.ModeSwitchRequested -= OnModeSwitchRequested;
 
         Close();
     }

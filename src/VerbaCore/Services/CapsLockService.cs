@@ -9,12 +9,35 @@ namespace VerbaCore.Services;
 /// - Quick tap (&lt;0.5s, no typing): toggles persistent search overlay
 /// - Long press (≥0.5s or typing while held): Enso-style, overlay hides on release
 /// </summary>
+/// <remarks>
+/// The hook runs on its own dedicated thread with a private message pump. Windows
+/// dispatches a WH_KEYBOARD_LL callback on the thread that installed it and lets the key
+/// through unhooked if the callback does not return within LowLevelHooksTimeout (300 ms
+/// by default) — which is what happens when the hook lives on a busy or paged-out WPF UI
+/// thread. Handlers of the events raised here therefore MUST NOT block; marshal to the UI
+/// thread with <c>Dispatcher.BeginInvoke</c>.
+/// </remarks>
 public sealed class CapsLockService : IDisposable
 {
     private const int LongPressThresholdMs = 500;
 
+    /// <summary>Private message posted to the hook thread to re-arm the hook.</summary>
+    private const uint WM_APP_REARM = 0x8000 + 1;
+
+    /// <summary>
+    /// Interval at which the hook is torn down and reinstalled. Guards against the hook
+    /// being silently dropped by Windows (timeout, session/desktop switch, UAC prompt) and
+    /// keeps the callback's code path resident in the working set while the app sits idle.
+    /// </summary>
+    private static readonly TimeSpan RearmInterval = TimeSpan.FromSeconds(45);
+
     private IntPtr _hookId = IntPtr.Zero;
     private NativeMethods.LowLevelKeyboardProc? _hookProc;
+    private Thread? _hookThread;
+    private uint _hookThreadId;
+    private System.Threading.Timer? _rearmTimer;
+    private volatile bool _disposed;
+
     private bool _capsDown;
     private string _buffer = string.Empty;
     private long _capsDownTimestamp;
@@ -22,7 +45,13 @@ public sealed class CapsLockService : IDisposable
     /// <summary>Set when Esc cancels a CapsLock hold, to suppress the subsequent KeyUp event.</summary>
     private bool _escapeCancelledHold;
 
-    /// <summary>Fired when CapsLock is pressed down.</summary>
+    /// <summary>
+    /// Foreground window captured the instant CapsLock went down, before the overlay steals
+    /// focus. Scopes the selected-text lookup to the app the user was actually working in.
+    /// </summary>
+    public IntPtr ForegroundWindowAtPress { get; private set; }
+
+    /// <summary>Fired when CapsLock is pressed down. Handlers must not block.</summary>
     public event EventHandler? CapsLockPressed;
 
     /// <summary>
@@ -40,6 +69,9 @@ public sealed class CapsLockService : IDisposable
     public event EventHandler<string>? BufferChanged;
     public event EventHandler<char>? CharTyped;
 
+    /// <summary>Fired when Tab is pressed, requesting a lookup-mode switch.</summary>
+    public event EventHandler? ModeSwitchRequested;
+
     public bool IsCapsDown => Volatile.Read(ref _capsDown);
     public string Buffer => Volatile.Read(ref _buffer);
     public bool TypedWhileHeld => Volatile.Read(ref _typedWhileHeld);
@@ -55,16 +87,82 @@ public sealed class CapsLockService : IDisposable
 
     public void Install()
     {
+        if (_hookThread is not null) return;
+
+        // Not disposed: the hook thread signals it, and disposing after a Wait timeout
+        // would make that Set() throw and kill the thread.
+        var ready = new ManualResetEventSlim(false);
+        _hookThread = new Thread(() => HookThreadMain(ready))
+        {
+            IsBackground = true,
+            Name = "VerbaCore.KeyboardHook",
+            // Overrunning the 300 ms hook timeout is what makes CapsLock fall through to
+            // the OS, so this thread must not be starved by UI or background work.
+            Priority = ThreadPriority.AboveNormal
+        };
+        _hookThread.SetApartmentState(ApartmentState.STA);
+        _hookThread.Start();
+        ready.Wait(TimeSpan.FromSeconds(5));
+
+        _rearmTimer = new System.Threading.Timer(_ => RequestRearm(), null, RearmInterval, RearmInterval);
+    }
+
+    private void HookThreadMain(ManualResetEventSlim ready)
+    {
+        _hookThreadId = NativeMethods.GetCurrentThreadId();
         _hookProc = HookCallback;
-        _hookId = NativeMethods.SetWindowsHookEx(
-            NativeMethods.WH_KEYBOARD_LL,
-            _hookProc,
-            NativeMethods.CachedModuleHandle,
-            0);
+        InstallHookCore();
 
         // Force CapsLock OFF after hook is installed
         // The hook filters injected keys, so this simulated press will pass through
         NativeMethods.ToggleCapsLockOff();
+
+        ready.Set();
+
+        // Private message pump — WH_KEYBOARD_LL callbacks are delivered through it.
+        while (NativeMethods.GetMessage(out var msg, IntPtr.Zero, 0, 0) > 0)
+        {
+            if (msg.hwnd == IntPtr.Zero && msg.message == WM_APP_REARM)
+            {
+                RearmHookCore();
+                continue;
+            }
+
+            NativeMethods.TranslateMessage(ref msg);
+            NativeMethods.DispatchMessage(ref msg);
+        }
+
+        UninstallHookCore();
+    }
+
+    private void InstallHookCore()
+    {
+        _hookId = NativeMethods.SetWindowsHookEx(
+            NativeMethods.WH_KEYBOARD_LL,
+            _hookProc!,
+            NativeMethods.CachedModuleHandle,
+            0);
+    }
+
+    private void UninstallHookCore()
+    {
+        if (_hookId == IntPtr.Zero) return;
+        NativeMethods.UnhookWindowsHookEx(_hookId);
+        _hookId = IntPtr.Zero;
+    }
+
+    /// <summary>Hook-thread only. Skipped mid-keystroke so no event is lost.</summary>
+    private void RearmHookCore()
+    {
+        if (_disposed || _capsDown) return;
+        UninstallHookCore();
+        InstallHookCore();
+    }
+
+    private void RequestRearm()
+    {
+        if (_disposed || _hookThreadId == 0) return;
+        NativeMethods.PostThreadMessage(_hookThreadId, WM_APP_REARM, IntPtr.Zero, IntPtr.Zero);
     }
 
     public void ClearBuffer()
@@ -120,6 +218,7 @@ public sealed class CapsLockService : IDisposable
                         _buffer = string.Empty;
                         _typedWhileHeld = false;
                         _capsDownTimestamp = Stopwatch.GetTimestamp();
+                        ForegroundWindowAtPress = NativeMethods.GetForegroundWindow();
                         CapsLockPressed?.Invoke(this, EventArgs.Empty);
                     }
                     return (IntPtr)1;
@@ -187,8 +286,7 @@ public sealed class CapsLockService : IDisposable
                 // Handle Tab — mode switch signal
                 if (vkCode == 0x09) // VK_TAB
                 {
-                    _buffer += '\t';
-                    BufferChanged?.Invoke(this, _buffer);
+                    ModeSwitchRequested?.Invoke(this, EventArgs.Empty);
                     return (IntPtr)1;
                 }
 
@@ -238,8 +336,7 @@ public sealed class CapsLockService : IDisposable
                 // Tab — mode switch
                 if (vkCode == 0x09)
                 {
-                    _buffer += '\t';
-                    BufferChanged?.Invoke(this, _buffer);
+                    ModeSwitchRequested?.Invoke(this, EventArgs.Empty);
                     return (IntPtr)1;
                 }
 
@@ -310,10 +407,20 @@ public sealed class CapsLockService : IDisposable
 
     public void Dispose()
     {
-        if (_hookId != IntPtr.Zero)
+        if (_disposed) return;
+        _disposed = true;
+
+        _rearmTimer?.Dispose();
+        _rearmTimer = null;
+
+        if (_hookThreadId != 0)
         {
-            NativeMethods.UnhookWindowsHookEx(_hookId);
-            _hookId = IntPtr.Zero;
+            NativeMethods.PostThreadMessage(_hookThreadId, NativeMethods.WM_QUIT, IntPtr.Zero, IntPtr.Zero);
+            _hookThread?.Join(TimeSpan.FromSeconds(2));
+            _hookThreadId = 0;
         }
+
+        _hookThread = null;
+        _hookProc = null;
     }
 }

@@ -116,16 +116,22 @@ public partial class App : Application
 
         // Create overlay window (hidden by default)
         _capsLockService = GetService<CapsLockService>();
+        var cursorText = GetService<CursorTextService>();
         _overlayWindow = new OverlayWindow(
             GetService<IOpenAiService>(),
             settings,
             history,
             _capsLockService,
-            GetService<CursorTextService>(),
+            cursorText,
             cache);
 
         // Install CapsLock hook
         _capsLockService.Install();
+
+        // Warm the cold paths (WPF render pass, UIA/COM) so the first CapsLock press after
+        // a long idle period stays well inside the 300 ms low-level hook budget.
+        _overlayWindow.PreWarm();
+        cursorText.PreWarm();
 
         // Set up system tray icon
         SetupTrayIcon();

@@ -57,6 +57,11 @@ src/VerbaCore/
 - When adding new JSON DTOs, register with `[JsonSerializable]` on an existing `JsonSerializerContext` or create a new one
 
 ## Performance Patterns
+- **Dedicated hook thread**: `WH_KEYBOARD_LL` is installed on its own STA thread with a private `GetMessage` pump. Windows delivers the callback on the installing thread and lets the key through unhooked if it doesn't return within `LowLevelHooksTimeout` (300ms) — the UI thread is too easily blocked to host it
+- **Non-blocking hook callbacks**: every `CapsLockService` event handler marshals with `Dispatcher.BeginInvoke`, never `Invoke`. Blocking inside the callback is what makes CapsLock fall through to plain case-toggling
+- **Hook re-arm watchdog**: the hook is reinstalled every 45s (skipped mid-keystroke), recovering from OS-dropped hooks and keeping the callback path resident in the working set
+- **Async UIA text grab**: `CursorTextService` runs all UIA3 calls on a dedicated STA worker; the overlay shows immediately and fills in the selection when it lands (800ms budget, stale requests dropped)
+- **Cold-start pre-warm**: `OverlayWindow.PreWarm()` (off-screen render pass) and `CursorTextService.PreWarm()` run at startup so the first CapsLock press doesn't pay WPF/COM initialization cost
 - **JSON source generation**: All Settings/History/API DTOs use `JsonSerializerContext` — eliminates reflection
 - **Streaming FlowDocument reuse**: `_streamingRun`/`_streamingDoc` caching prevents new WPF object creation every 200ms
 - **SSE Utf8JsonReader**: Zero-alloc `Utf8JsonReader` instead of `JsonDocument` for streaming JSON parsing
@@ -67,7 +72,7 @@ src/VerbaCore/
 - **PublishReadyToRun**: AOT precompilation on publish builds
 
 ## Key Architecture Decisions
-1. **CapsLock quasimodal**: `SetWindowsHookEx` WH_KEYBOARD_LL intercepts CapsLock. EnsoHold(≥0.5s) vs QuickTap(<0.5s) distinction
+1. **CapsLock quasimodal**: `SetWindowsHookEx` WH_KEYBOARD_LL intercepts CapsLock from a dedicated hook thread. EnsoHold(≥0.5s) vs QuickTap(<0.5s) distinction. Tab raises `ModeSwitchRequested` instead of round-tripping through the buffer
 2. **6-provider SSE**: HttpClient + `ResponseHeadersRead` + `StreamReader` → `Utf8JsonReader` chunk parsing
 3. **3 Lookup Modes**: Dictionary(≤3 words), Translate(>3 words), Assist(code/URL/formula/non-language) — `PromptBuilder.AutoSelectMode()` auto-selects
 4. **Overlay**: Transparent `Window` + `AllowsTransparency="True"`. 220ms fade in / 180ms fade out. Global mouse hook for outside-click detection
