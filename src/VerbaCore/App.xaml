@@ -27,8 +27,12 @@
             <FontFamily x:Key="AppCodeFont">Cascadia Code, Consolas, monospace</FontFamily>
 
             <!-- Override Markdig.Wpf code styles: remove light gray background that
-                 makes white text unreadable on the dark overlay. -->
-            <Style x:Key="{x:Static markdig:Styles.CodeStyleKey}" TargetType="{x:Type Inline}">
+                 makes white text unreadable on the dark overlay.
+                 NOTE: inline code is rendered by Markdig.Wpf as a <Run>, so this style
+                 MUST target Run. Targeting Span throws InvalidOperationException at
+                 render time ("'Span' TargetType does not match type of element 'Run'"),
+                 which made every result containing inline code fall back to raw source. -->
+            <Style x:Key="{x:Static markdig:Styles.CodeStyleKey}" TargetType="{x:Type Run}">
                 <Setter Property="FontFamily" Value="{StaticResource AppCodeFont}" />
                 <Setter Property="Background" Value="Transparent" />
                 <Setter Property="Foreground" Value="#FFE6B85C" />

@@ -355,25 +355,22 @@ public partial class OverlayWindow : Window
     /// </summary>
     private void OnQuickTapReleased(object? sender, EventArgs e)
     {
-        Dispatcher.BeginInvoke(() => _ = HandleQuickTapReleasedAsync());
-    }
-
-    private async Task HandleQuickTapReleasedAsync()
-    {
-        if (_isShown && !_justOpened)
+        Dispatcher.Invoke(() =>
         {
-            // Overlay was already showing before this CapsLock press — close it
-            _capsLockService.PersistentModeActive = false;
-            _persistentMode = false;
-            _cursorBlinkStoryboard?.Stop();
-            HideOverlay();
-            return;
-        }
-
-        _justOpened = false;
-        // First quick tap — enter persistent mode with IME TextBox
-        _persistentMode = true;
-        _capsLockService.PersistentModeActive = false; // Don't intercept keys — let TextBox handle them
+            if (_isShown && !_justOpened)
+            {
+                // Overlay was already showing before this CapsLock press ??close it
+                _capsLockService.PersistentModeActive = false;
+                _persistentMode = false;
+                _cursorBlinkStoryboard?.Stop();
+                HideOverlay();
+            }
+            else
+            {
+                _justOpened = false;
+                // First quick tap ??enter persistent mode with IME TextBox
+                _persistentMode = true;
+                _capsLockService.PersistentModeActive = false; // Don't intercept keys ??let TextBox handle them
 
         // Switch to TextBox UI
         InputDisplay.Text = "";
@@ -430,16 +427,13 @@ public partial class OverlayWindow : Window
     /// </summary>
     private void OnLongPressReleased(object? sender, EventArgs e)
     {
-        Dispatcher.BeginInvoke(() => _ = HandleLongPressReleasedAsync());
-    }
-
-    private async Task HandleLongPressReleasedAsync()
-    {
-        _persistentMode = false;
-        _capsLockService.PersistentModeActive = false;
-        _cursorBlinkStoryboard?.Stop();
-        BlinkingCursor.Visibility = Visibility.Collapsed;
-        HintLabel.Visibility = Visibility.Collapsed;
+        Dispatcher.Invoke(() =>
+        {
+            _persistentMode = false;
+            _capsLockService.PersistentModeActive = false;
+            _cursorBlinkStoryboard?.Stop();
+            BlinkingCursor.Visibility = Visibility.Collapsed;
+            HintLabel.Visibility = Visibility.Collapsed;
 
         var session = _selectedTextSession;
         var input = _capsLockService.Buffer.Trim();
@@ -647,10 +641,9 @@ public partial class OverlayWindow : Window
         _streamingRun = null;
         _streamingDoc = null;
 
-        // Compact input display for Translate/Assist modes (long text ??shrink to summary)
-        // Dictionary mode keeps the original large word display
-        if (_currentMode is LookupMode.Translate or LookupMode.Assist)
-            CompactInputDisplay(input);
+        // Keep the input text visible during the loading phase so it never disappears
+        // mid-lookup. The input is compacted (for Translate/Assist modes) only once the
+        // result is ready to render (see the cache-hit and first-chunk paths below).
 
         // Show loading indicator until first chunk arrives
         ResultViewer.Visibility = Visibility.Collapsed;
@@ -673,6 +666,8 @@ public partial class OverlayWindow : Window
         if (_settingsService.Current.EnableLookupCache && !bypassCache && _cacheService.TryGet(cacheKey, out var cachedResponse))
         {
             StopLoadingSpinner();
+            if (_currentMode is LookupMode.Translate or LookupMode.Assist)
+                CompactInputDisplay(input);
             ShowResultViewer();
             RenderMarkdown(cachedResponse);
             StatusLabel.Text = Loc("Overlay_StatusCached");
@@ -697,6 +692,8 @@ public partial class OverlayWindow : Window
                 {
                     firstChunk = false;
                     StopLoadingSpinner();
+                    if (_currentMode is LookupMode.Translate or LookupMode.Assist)
+                        CompactInputDisplay(input);
                     ShowResultViewer();
                 }
                 sb.Append(chunk);
@@ -706,7 +703,8 @@ public partial class OverlayWindow : Window
                 if ((now - _lastRenderTime).TotalMilliseconds >= RenderThrottleMs)
                 {
                     _lastRenderTime = now;
-                    RenderPlainText(sb.ToString());
+                    // Render formatted Markdown live during streaming (not raw source).
+                    RenderMarkdown(sb.ToString());
                     await Task.Yield(); // Release UI thread to paint
                 }
             }
@@ -843,24 +841,6 @@ public partial class OverlayWindow : Window
         }
 
         Activate();
-    }
-
-    /// <summary>
-    /// Realizes the HWND and runs one render pass off-screen so the first real activation
-    /// isn't slowed down by WPF's cold-start cost.
-    /// </summary>
-    public void PreWarm()
-    {
-        Left = -32000;
-        Top = -32000;
-        Opacity = 0;
-        ShowActivated = false; // don't steal focus from whatever the user is doing at startup
-        Show();
-        Dispatcher.BeginInvoke(DispatcherPriority.ContextIdle, () =>
-        {
-            if (!_isShown) Hide();
-            ShowActivated = true;
-        });
     }
 
     private void ShowOverlay()
@@ -1078,13 +1058,21 @@ public partial class OverlayWindow : Window
 
         try
         {
-            // 명시적으로 Document를 먼저 null로 설정하여 이전 콘텐츠 제거
+            // Explicitly clear the previous document before rebuilding.
             ResultViewer.Document = null;
-            
-            var doc = Markdig.Wpf.Markdown.ToFlowDocument(markdown, MarkdownPipeline);
+
+            var normalized = NormalizeMarkdown(markdown);
+
+            // In Dictionary mode the looked-up word is already shown large in InputDisplay,
+            // so drop a leading heading that merely echoes it — otherwise the same word
+            // appears twice and wastes vertical space for the actual content.
+            if (_currentMode == LookupMode.Dictionary)
+                normalized = StripEchoedTitle(normalized, _lastLookupInput);
+
+            var doc = Markdig.Wpf.Markdown.ToFlowDocument(normalized, MarkdownPipeline);
             if (doc == null)
             {
-                // 마크다운 변환 실패 시 평문 렌더링
+                // Fall back to plain text if Markdown conversion yields nothing.
                 RenderPlainText(markdown);
                 return;
             }
@@ -1097,6 +1085,118 @@ public partial class OverlayWindow : Window
             System.Diagnostics.Debug.WriteLine($"[OverlayWindow] Markdown rendering failed: {ex.Message}");
             RenderPlainText(markdown);
         }
+    }
+
+    /// <summary>
+    /// Some models (e.g. gpt-5.x) wrap their entire answer in a fenced code block
+    /// (```markdown ... ``` or even a bare ``` ... ```), which Markdig renders as a
+    /// literal code block — so the user sees raw source instead of a formatted document.
+    /// If the whole response parses to a single code block, unwrap it. Real language
+    /// blocks (```python, ```json, ...) are left intact so Assist-mode code still renders
+    /// as code. Works mid-stream too: an unclosed fence parses as a code block to end.
+    /// </summary>
+    private static string NormalizeMarkdown(string markdown)
+    {
+        if (string.IsNullOrEmpty(markdown)) return markdown;
+
+        try
+        {
+            var parsed = Markdig.Markdown.Parse(markdown, MarkdownPipeline);
+            if (parsed.Count == 1 && parsed[0] is Markdig.Syntax.CodeBlock cb)
+            {
+                var info = (cb as Markdig.Syntax.FencedCodeBlock)?.Info;
+                if (string.IsNullOrEmpty(info)
+                    || info.Equals("markdown", StringComparison.OrdinalIgnoreCase)
+                    || info.Equals("md", StringComparison.OrdinalIgnoreCase))
+                {
+                    return cb.Lines.ToString();
+                }
+            }
+        }
+        catch
+        {
+            // On any parse issue, fall through and render the original markdown as-is.
+        }
+
+        return markdown;
+    }
+
+    /// <summary>
+    /// Dictionary-mode responses sometimes lead with a heading (or lone emphasized line)
+    /// that just repeats the looked-up word — e.g. <c>## intrusion</c>. That word is
+    /// already displayed prominently in <see cref="InputDisplay"/>, so the echoed title
+    /// is redundant and steals content space. If the first non-empty line resolves to the
+    /// same word, remove it (plus the following blank line). A heading that is only a
+    /// prefix of the word is also stripped so it never flickers into view mid-stream.
+    /// </summary>
+    private static string StripEchoedTitle(string markdown, string? inputWord)
+    {
+        if (string.IsNullOrEmpty(markdown) || string.IsNullOrWhiteSpace(inputWord))
+            return markdown;
+
+        var targetWord = NormalizeForTitleMatch(inputWord);
+        if (targetWord.Length == 0) return markdown;
+
+        var lineStart = 0;
+        while (lineStart < markdown.Length)
+        {
+            var lineEnd = markdown.IndexOf('\n', lineStart);
+            if (lineEnd < 0) lineEnd = markdown.Length;
+            var line = markdown[lineStart..lineEnd];
+
+            // Skip leading blank lines.
+            if (line.Trim().Length == 0)
+            {
+                lineStart = lineEnd + 1;
+                continue;
+            }
+
+            var normalizedLine = NormalizeForTitleMatch(line);
+            var isHeading = line.TrimStart().StartsWith('#');
+            var echoesWord = normalizedLine.Length > 0
+                && (normalizedLine == targetWord
+                    // Mid-stream a heading arrives character-by-character (e.g. "## intr");
+                    // treat any heading that is a prefix of the word as the echoed title.
+                    || (isHeading && targetWord.StartsWith(normalizedLine, StringComparison.Ordinal)));
+
+            if (!echoesWord) return markdown; // Real content — leave it untouched.
+
+            // Drop the echoed line and any blank line(s) immediately after it.
+            var rest = lineEnd < markdown.Length ? lineEnd + 1 : markdown.Length;
+            while (rest < markdown.Length && (markdown[rest] == '\n' || markdown[rest] == '\r'))
+                rest++;
+            return markdown[rest..];
+        }
+
+        return markdown;
+    }
+
+    /// <summary>
+    /// Reduces a candidate title line and the input word to a comparable form by dropping
+    /// markdown markers (<c>#</c>, <c>*</c>, <c>_</c>, <c>`</c>, <c>~</c>), whitespace, and
+    /// surrounding punctuation, then lower-casing. Both sides use the same normalization so
+    /// comparisons stay symmetric regardless of how the model wrapped the word.
+    /// </summary>
+    private static string NormalizeForTitleMatch(string text)
+    {
+        if (string.IsNullOrEmpty(text)) return string.Empty;
+
+        var buffer = new char[text.Length];
+        var n = 0;
+        foreach (var ch in text)
+        {
+            if (ch is '#' or '*' or '_' or '`' or '~' || char.IsWhiteSpace(ch)) continue;
+            buffer[n++] = char.ToLowerInvariant(ch);
+        }
+
+        static bool IsTrimPunct(char c) =>
+            c is '.' or ',' or ':' or ';' or '!' or '?' or '"' or '\'' or '“' or '”'
+              or '(' or ')' or '[' or ']' or '-';
+
+        int start = 0, end = n;
+        while (start < end && IsTrimPunct(buffer[start])) start++;
+        while (end > start && IsTrimPunct(buffer[end - 1])) end--;
+        return new string(buffer, start, end - start);
     }
 
     /// <summary>

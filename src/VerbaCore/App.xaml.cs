@@ -136,6 +136,17 @@ public partial class App : Application
         // Set up system tray icon
         SetupTrayIcon();
 
+        // Warm up the slow one-time costs during startup idle so the FIRST CapsLock
+        // activation pops up instantly: (1) build/render the overlay's visual tree
+        // off-screen, and (2) initialize the UIA accessibility client. Both otherwise
+        // run on the critical path the first time and can cost several seconds.
+        var cursorText = GetService<CursorTextService>();
+        _ = Dispatcher.BeginInvoke(DispatcherPriority.Background, () =>
+        {
+            _overlayWindow?.PrimeRender();
+            cursorText.WarmUp();
+        });
+
         // Background auto-update check (fire-and-forget). Throttled to once per 24h.
         if (settings.Current.AutoCheckUpdate)
         {

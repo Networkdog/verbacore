@@ -96,7 +96,7 @@ public sealed partial class PromptBuilder
                 $"The heading, IPA, and examples must all be for the {foreignLanguage} word — NOT for the {nativeLanguage} input. " +
                 $"When the user inputs a word in any other language, explain it in {nativeLanguage} with references to {foreignLanguage} equivalents where helpful. " +
                 $"Provide IPA for the {foreignLanguage} word's pronunciation. Write all explanations in natural {nativeLanguage}. " +
-                "Use markdown formatting.",
+                "Use Markdown formatting. Output the Markdown directly; do not wrap the whole response in a code fence.",
 
             LookupMode.Translate =>
                 $"You are a professional translator. " +
@@ -105,13 +105,13 @@ public sealed partial class PromptBuilder
                 $"When the user inputs text in {nativeLanguage}, translate it to {foreignLanguage}. " +
                 $"When the user inputs text in any other language, translate it to {nativeLanguage}. " +
                 $"Provide accurate translations with brief notes on nuances when applicable. " +
-                "Use markdown formatting for readability.",
+                "Use Markdown formatting for readability. Output the Markdown directly; do not wrap the whole response in a code fence.",
 
             LookupMode.Assist =>
                 $"You are a knowledgeable assistant. The user's native language is {nativeLanguage}. " +
                 $"The user has selected some text (code, a URL, an error message, a formula, or other non-language content) and wants to understand it. " +
                 $"Infer what the user most likely wants to know about the given text, and answer that question directly in {nativeLanguage}. " +
-                $"Be concise but thorough. Use markdown formatting.",
+                $"Be concise but thorough. Use Markdown formatting. Output the Markdown directly; do not wrap the whole response in a code fence.",
 
             _ => "You are a helpful assistant."
         };

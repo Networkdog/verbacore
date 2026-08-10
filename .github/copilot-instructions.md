@@ -33,14 +33,14 @@ src/VerbaCore/
 │   ├── Strings.ko.xaml        — Korean UI string resources
 │   └── Strings.en.xaml        — English UI string resources
 ├── Services/
-│   ├── CapsLockService.cs     — Low-level keyboard hook, EnsoHold/QuickTap detection
+│   ├── CapsLockService.cs     — Low-level keyboard hook on a dedicated message-pump thread, EnsoHold/QuickTap detection
 │   ├── OpenAiService.cs       — 6-provider SSE streaming + Utf8JsonReader parsing
 │   ├── PromptBuilder.cs       — Mode-specific prompt generation + AutoMode selection
 │   ├── SettingsService.cs     — JSON settings load/save + DPAPI (source-generated)
 │   ├── HistoryService.cs      — JSON history + debounced save (source-generated)
 │   ├── HotkeyService.cs       — NHotkey global hotkey registration/unregistration
 │   ├── LocalizationService.cs — Runtime UI language switching via ResourceDictionary swap
-│   └── CursorTextService.cs   — COM UIA3 selected text extraction
+    └── CursorTextService.cs   — COM UIA3 selected text extraction (+ startup PreWarm)
 └── Helpers/
     ├── NativeMethods.cs       — Win32 P/Invoke + CachedModuleHandle
     ├── UIA3Interop.cs         — COM UIA3 interface definitions
@@ -49,7 +49,7 @@ src/VerbaCore/
 
 ## Coding Conventions
 - Use `file-scoped namespaces`
-- Use `primary constructors` where appropriate
+- Use `primary constructors` for classes whose only constructor sets readonly fields via DI injection (e.g., services). Do not use them when the constructor body contains any logic beyond field assignment — e.g. event subscriptions, method calls, validation, or conditional branching
 - `CommunityToolkit.Mvvm` attributes: `[ObservableProperty]`, `[RelayCommand]`
 - `System.Text.Json` serialization — **always use source generation contexts** (`SettingsJsonContext`, `HistoryJsonContext`, `ApiJsonContext`)
 - All async methods must accept `CancellationToken`
@@ -57,13 +57,13 @@ src/VerbaCore/
 - When adding new JSON DTOs, register with `[JsonSerializable]` on an existing `JsonSerializerContext` or create a new one
 
 ## Performance Patterns
-- **Dedicated hook thread**: `WH_KEYBOARD_LL` is installed on its own STA thread with a private `GetMessage` pump. Windows delivers the callback on the installing thread and lets the key through unhooked if it doesn't return within `LowLevelHooksTimeout` (300ms) — the UI thread is too easily blocked to host it
+- **Dedicated hook thread**: `WH_KEYBOARD_LL` is installed on its own STA thread with a private `GetMessage` pump. Windows delivers the callback on the installing thread and lets the key through unhooked if it doesn't return within `LowLevelHooksTimeout` (300ms) — the UI thread is too easily blocked to host it. Keeping the callback off the UI thread is what makes CapsLock suppression reliable (no caps-mode toggling) even while the overlay/UIA initialize on first use
 - **Non-blocking hook callbacks**: every `CapsLockService` event handler marshals with `Dispatcher.BeginInvoke`, never `Invoke`. Blocking inside the callback is what makes CapsLock fall through to plain case-toggling
 - **Hook re-arm watchdog**: the hook is reinstalled every 45s (skipped mid-keystroke), recovering from OS-dropped hooks and keeping the callback path resident in the working set
 - **Async UIA text grab**: `CursorTextService` runs all UIA3 calls on a dedicated STA worker; the overlay shows immediately and fills in the selection when it lands (800ms budget, stale requests dropped)
-- **Cold-start pre-warm**: `OverlayWindow.PreWarm()` (off-screen render pass) and `CursorTextService.PreWarm()` run at startup so the first CapsLock press doesn't pay WPF/COM initialization cost
+- **Cold-start pre-warm**: `OverlayWindow.PreWarm()` (off-screen render pass of the visual tree) and `CursorTextService.PreWarm()` (UIA client init) run once at startup, so the first CapsLock activation pops up instantly instead of paying WPF/COM initialization cost on the critical path
 - **JSON source generation**: All Settings/History/API DTOs use `JsonSerializerContext` — eliminates reflection
-- **Streaming FlowDocument reuse**: `_streamingRun`/`_streamingDoc` caching prevents new WPF object creation every 200ms
+- **Live Markdown streaming**: results render as formatted Markdown *during* streaming (throttled to 200ms via `RenderThrottleMs`), not just at the end; `RenderMarkdown` also unwraps an outer ` ```markdown ` fence that some models (gpt-5.x) wrap the whole answer in. `_streamingRun`/`_streamingDoc` caching backs the plain-text fallback (`RenderPlainText`)
 - **SSE Utf8JsonReader**: Zero-alloc `Utf8JsonReader` instead of `JsonDocument` for streaming JSON parsing
 - **Cursor animation GPU acceleration**: WPF Storyboard on composition thread instead of DispatcherTimer
 - **Module handle caching**: `NativeMethods.CachedModuleHandle` avoids Process allocation on every hook install
@@ -72,7 +72,11 @@ src/VerbaCore/
 - **PublishReadyToRun**: AOT precompilation on publish builds
 
 ## Key Architecture Decisions
+<<<<<<< HEAD
 1. **CapsLock quasimodal**: `SetWindowsHookEx` WH_KEYBOARD_LL intercepts CapsLock from a dedicated hook thread. EnsoHold(≥0.5s) vs QuickTap(<0.5s) distinction. Tab raises `ModeSwitchRequested` instead of round-tripping through the buffer
+=======
+1. **CapsLock quasimodal**: `SetWindowsHookEx` WH_KEYBOARD_LL intercepts CapsLock on a **dedicated message-pump thread** (never blocked by UI work → reliable suppression, no caps toggling). EnsoHold(≥0.5s) vs QuickTap(<0.5s) distinction
+>>>>>>> 70dc8dd2581e07f4d0c6e5c8799e13ad061ce4d3
 2. **6-provider SSE**: HttpClient + `ResponseHeadersRead` + `StreamReader` → `Utf8JsonReader` chunk parsing
 3. **3 Lookup Modes**: Dictionary(≤3 words), Translate(>3 words), Assist(code/URL/formula/non-language) — `PromptBuilder.AutoSelectMode()` auto-selects
 4. **Overlay**: Transparent `Window` + `AllowsTransparency="True"`. 220ms fade in / 180ms fade out. Global mouse hook for outside-click detection
@@ -92,12 +96,17 @@ When code changes, update these documents accordingly:
 - **`README.md`**: Features, Project Structure, Tech Stack sections
 - **`.github/skills/glossary/SKILL.md`**: Element Glossary (when adding/removing/renaming elements)
 
-Specifically:
-1. New file/service added → update Project Structure
-2. New NuGet package → update Tech Stack
-3. New performance optimization → update Performance Patterns
-4. New UI element/shortcut/mode → update SKILL.md Glossary
-5. Feature added/removed → update README.md Features
+Look up the row matching your change, then update only the sections named in each column (— means no update needed for that document):
+
+| Change trigger | copilot-instructions.md (this file) | README.md | SKILL.md (glossary) |
+|----------------|-------------------------------------|-----------|---------------------|
+| New file/service added | Project Structure | Project Structure | — |
+| File/service removed or renamed | Project Structure | Project Structure | Element Glossary |
+| New NuGet package | Tech Stack | Tech Stack | — |
+| New performance optimization | Performance Patterns | — | — |
+| Coding convention added/changed | Coding Conventions | — | — |
+| New UI element/shortcut/mode | — | — | Element Glossary |
+| Feature added/removed | — | Features | — |
 
 ## Important Notes
 - `UseWindowsForms=true` — for NotifyIcon; `GlobalUsings.cs` resolves WPF/WinForms conflicts
