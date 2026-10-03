@@ -25,6 +25,10 @@ public partial class OverlayWindow : Window
     private readonly LookupCacheService _cacheService;
 
     private readonly DispatcherTimer _autoHideTimer;
+    private readonly DispatcherTimer _idleWarmupTimer;
+    private readonly FlowDocument _emptyDocument = new();
+    private bool _inputPrepared;
+    private bool _isClosing;
     private CancellationTokenSource? _cts;
     private DateTime _lastRenderTime = DateTime.MinValue;
     private const int RenderThrottleMs = 200;
@@ -39,6 +43,9 @@ public partial class OverlayWindow : Window
 
     /// <summary>Whether the overlay is in persistent (quick-tap) mode.</summary>
     private bool _persistentMode;
+    private bool _holdInputMode;
+    private bool _updatingInputText;
+    private long _inputGesture;
     /// <summary>Whether the overlay is currently visible.</summary>
     private bool _isShown;
     /// <summary>Set when CapsLock down opens a fresh overlay, cleared on release.</summary>
@@ -57,10 +64,6 @@ public partial class OverlayWindow : Window
     private string? _lastLookupInput;
     /// <summary>When true, skip cache lookup for the next request only.</summary>
     private bool _ignoreCacheForNextLookup;
-    // Global mouse hook to detect clicks outside the overlay
-    private IntPtr _mouseHookId = IntPtr.Zero;
-    private NativeMethods.LowLevelMouseProc? _mouseHookProc;
-
     private static readonly MarkdownPipeline MarkdownPipeline = new MarkdownPipelineBuilder()
         .UseSupportedExtensions()
         .Build();
@@ -127,13 +130,21 @@ public partial class OverlayWindow : Window
             HideOverlay();
         };
 
+        _idleWarmupTimer = new DispatcherTimer(DispatcherPriority.ContextIdle)
+        {
+            Interval = TimeSpan.FromSeconds(30)
+        };
+        _idleWarmupTimer.Tick += (_, _) => WarmUpInputSurface();
+
         // CapsLock events
         _capsLockService.CapsLockPressed += OnCapsLockPressed;
         _capsLockService.QuickTapReleased += OnQuickTapReleased;
         _capsLockService.LongPressReleased += OnLongPressReleased;
+        _capsLockService.HoldCancelled += OnHoldCancelled;
         _capsLockService.BufferChanged += OnBufferChanged;
         _capsLockService.EnterPressed += OnEnterPressed;
         _capsLockService.ModeSwitchRequested += OnModeSwitchRequested;
+        _capsLockService.MousePressed += OnGlobalMousePressed;
 
         // Handle Tab key for mode switching (in the keyboard hook)
         PreviewKeyDown += (_, e) =>
@@ -152,8 +163,8 @@ public partial class OverlayWindow : Window
                 return;
             }
 
-            // In persistent mode, let the TextBox handle input
-            if (_persistentMode)
+            // Let the native TextBox handle input in either mode.
+            if (_persistentMode || _holdInputMode)
                 return;
 
             // While viewing results, allow Escape to close but don't eat other keys
@@ -199,7 +210,15 @@ public partial class OverlayWindow : Window
         InputTextBox.PreviewKeyDown += OnInputTextBoxKeyDown;
 
         // Adjust font size dynamically as user types in persistent mode
-        InputTextBox.TextChanged += (_, _) => AdjustInputFontSize(InputTextBox.Text);
+        InputTextBox.TextChanged += (_, _) =>
+        {
+            AdjustInputFontSize(InputTextBox.Text);
+            if (_holdInputMode && !_updatingInputText)
+                _capsLockService.UpdateTextInput(InputTextBox.Text);
+        };
+        InputTextBox.GotKeyboardFocus += (_, _) =>
+            _capsLockService.TextInputWindow = new WindowInteropHelper(this).Handle;
+        InputTextBox.LostKeyboardFocus += (_, _) => _capsLockService.TextInputWindow = IntPtr.Zero;
     }
 
     private void OnInputTextBoxKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
@@ -207,6 +226,7 @@ public partial class OverlayWindow : Window
         if (e.Key == System.Windows.Input.Key.Enter)
         {
             e.Handled = true;
+            if (_holdInputMode) return;
             var input = InputTextBox.Text.Trim();
             if (!string.IsNullOrEmpty(input))
             {
@@ -254,13 +274,14 @@ public partial class OverlayWindow : Window
         // Runs on the keyboard hook thread. Only enqueue work here: if this callback takes
         // longer than LowLevelHooksTimeout (300 ms) Windows drops the hook for this event
         // and CapsLock just toggles case instead of opening the overlay.
-        var grabTask = _cursorTextService.GetSelectedTextAsync(
-            _capsLockService.ForegroundWindowAtPress, CancellationToken.None);
+        Interlocked.Increment(ref _inputGesture);
+        var foregroundWindow = _capsLockService.ForegroundWindowAtPress;
 
         Dispatcher.BeginInvoke(() =>
         {
             // If overlay is already showing, mark that we did NOT just open it
             // (so quick-tap release will close it)
+            if (_isClosing) return;
             if (_isShown)
             {
                 _justOpened = false;
@@ -274,39 +295,61 @@ public partial class OverlayWindow : Window
 
             var session = ++_selectedTextSession;
             _grabbedSelectedText = null;
+            var grabTask = _cursorTextService.GetSelectedTextAsync(foregroundWindow, CancellationToken.None);
             _selectedTextTask = grabTask;
 
-            // Reset UI for new input
-            InputDisplay.Text = "";
-            InputDisplay.FontWeight = FontWeights.Light;
-            InputDisplay.Foreground = WhiteBrush;
-            InputDisplay.TextWrapping = TextWrapping.Wrap;
-            InputDisplay.TextTrimming = TextTrimming.CharacterEllipsis;
-            InputDisplay.MaxHeight = 220;
-            AdjustInputFontSize(InputDisplay.Text);
-            InputDisplay.Visibility = Visibility.Visible;
-            InputTextBox.Text = "";
-            InputTextBox.Visibility = Visibility.Collapsed;
-            ResultViewer.Document = new FlowDocument();
-            ResultViewer.Visibility = Visibility.Collapsed;
-            StopLoadingSpinner();
-            BlinkingCursor.Visibility = Visibility.Visible;
-            HintLabel.Visibility = Visibility.Visible;
-            StatusLabel.Text = Loc("Overlay_StatusDefault");
-            SetIgnoreCacheButtonVisible(false);
-
-            UpdateModeLabel();
-            UpdateCursorPosition();
+            if (_inputPrepared)
+            {
+                StatusLabel.Text = Loc("Overlay_StatusDefault");
+                UpdateModeLabel();
+            }
+            else
+            {
+                PrepareInput();
+            }
+            _inputPrepared = false;
+            _holdInputMode = true;
+            InputDisplay.Visibility = Visibility.Collapsed;
+            InputTextBox.Visibility = Visibility.Visible;
+            AdjustInputFontSize(InputTextBox.Text);
+            BlinkingCursor.Visibility = Visibility.Collapsed;
 
             // Show overlay (Enso-style hold mode for now — may become persistent on quick tap)
             if (!_isShown)
             {
                 ShowOverlay();
             }
-            _cursorBlinkStoryboard?.Begin();
+            InputTextBox.Focus();
+            System.Windows.Input.Keyboard.Focus(InputTextBox);
 
             _ = ShowGrabbedSelectionAsync(grabTask, session);
         });
+    }
+
+    private void PrepareInput()
+    {
+        _holdInputMode = false;
+        _capsLockService.TextInputWindow = IntPtr.Zero;
+        InputDisplay.Text = "";
+        InputDisplay.FontWeight = FontWeights.Light;
+        InputDisplay.Foreground = WhiteBrush;
+        InputDisplay.TextWrapping = TextWrapping.Wrap;
+        InputDisplay.TextTrimming = TextTrimming.CharacterEllipsis;
+        InputDisplay.MaxHeight = 220;
+        AdjustInputFontSize(InputDisplay.Text);
+        InputDisplay.Visibility = Visibility.Visible;
+        InputTextBox.Text = "";
+        InputTextBox.Visibility = Visibility.Collapsed;
+        ResultViewer.Document = _emptyDocument;
+        ResultViewer.Visibility = Visibility.Collapsed;
+        StopLoadingSpinner();
+        BlinkingCursor.Visibility = Visibility.Visible;
+        HintLabel.Visibility = Visibility.Visible;
+        StatusLabel.Text = Loc("Overlay_StatusDefault");
+        SetIgnoreCacheButtonVisible(false);
+        UpdateModeLabel();
+        UpdateCursorPosition();
+        _inputPrepared = true;
     }
 
     /// <summary>
@@ -324,9 +367,31 @@ public partial class OverlayWindow : Window
         if (_capsLockService.TypedWhileHeld || _capsLockService.Buffer.Length > 0) return;
         if (ResultViewer.Visibility == Visibility.Visible) return;
 
-        InputDisplay.Text = text;
-        AdjustInputFontSize(text);
-        UpdateCursorPosition();
+        if (_holdInputMode)
+        {
+            SetInputText(text);
+            InputTextBox.SelectAll();
+        }
+        else
+        {
+            InputDisplay.Text = text;
+            AdjustInputFontSize(text);
+            UpdateCursorPosition();
+        }
+    }
+
+    private void SetInputText(string text)
+    {
+        _updatingInputText = true;
+        try
+        {
+            InputTextBox.Text = text;
+            InputTextBox.CaretIndex = text.Length;
+        }
+        finally
+        {
+            _updatingInputText = false;
+        }
     }
 
     /// <summary>Bounded wait so a slow or unresponsive app can't stall the overlay.</summary>
@@ -355,11 +420,13 @@ public partial class OverlayWindow : Window
     /// </summary>
     private void OnQuickTapReleased(object? sender, EventArgs e)
     {
-        Dispatcher.BeginInvoke(() => _ = HandleQuickTapReleasedAsync());
+        var gesture = Volatile.Read(ref _inputGesture);
+        Dispatcher.BeginInvoke(() => _ = HandleQuickTapReleasedAsync(gesture, CancellationToken.None));
     }
 
-    private async Task HandleQuickTapReleasedAsync()
+    private async Task HandleQuickTapReleasedAsync(long gesture, CancellationToken ct)
     {
+        _holdInputMode = false;
         if (_isShown && !_justOpened)
         {
             // Overlay was already showing before this CapsLock press — close it
@@ -382,7 +449,7 @@ public partial class OverlayWindow : Window
         AdjustInputFontSize(InputTextBox.Text);
         InputTextBox.Visibility = Visibility.Visible;
         BlinkingCursor.Visibility = Visibility.Collapsed;
-        ResultViewer.Document = new FlowDocument();
+        ResultViewer.Document = _emptyDocument;
         ResultViewer.Visibility = Visibility.Collapsed;
         StopLoadingSpinner();
         HintLabel.Visibility = Visibility.Visible;
@@ -396,14 +463,16 @@ public partial class OverlayWindow : Window
         StatusLabel.Text = Loc("Overlay_StatusInputPrompt");
         SetIgnoreCacheButtonVisible(false);
 
-        // Focus the TextBox for IME input — use ForceActivate to steal focus from other apps
+        // Focus the TextBox for IME input.
         ForceActivate();
-        await Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Input, () =>
+        await Dispatcher.InvokeAsync(() =>
         {
+            if (_isClosing || !_isShown || gesture != Volatile.Read(ref _inputGesture)) return;
             ForceActivate();
             InputTextBox.Focus();
             System.Windows.Input.Keyboard.Focus(InputTextBox);
-        });
+        }, DispatcherPriority.Input, ct);
+        if (_isClosing || !_isShown || gesture != Volatile.Read(ref _inputGesture)) return;
 
         // The selection grab started at CapsLock-down; auto-run it once it lands.
         var session = _selectedTextSession;
@@ -411,7 +480,7 @@ public partial class OverlayWindow : Window
         if (grabTask is null) return;
 
         var selected = await AwaitSelectionAsync(grabTask);
-        if (session != _selectedTextSession) return;
+        if (session != _selectedTextSession || gesture != Volatile.Read(ref _inputGesture)) return;
 
         _grabbedSelectedText = selected;
         if (string.IsNullOrWhiteSpace(selected)) return;
@@ -430,11 +499,23 @@ public partial class OverlayWindow : Window
     /// </summary>
     private void OnLongPressReleased(object? sender, EventArgs e)
     {
-        Dispatcher.BeginInvoke(() => _ = HandleLongPressReleasedAsync());
+        var gesture = Volatile.Read(ref _inputGesture);
+        Dispatcher.BeginInvoke(DispatcherPriority.Background,
+            () => _ = HandleLongPressReleasedAsync(gesture, CancellationToken.None));
     }
 
-    private async Task HandleLongPressReleasedAsync()
+    private void OnHoldCancelled(object? sender, EventArgs e)
     {
+        var gesture = Volatile.Read(ref _inputGesture);
+        Dispatcher.BeginInvoke(() =>
+        {
+            if (gesture == Volatile.Read(ref _inputGesture)) HideOverlay();
+        });
+    }
+
+    private async Task HandleLongPressReleasedAsync(long gesture, CancellationToken ct)
+    {
+        if (_isClosing || !_isShown || gesture != Volatile.Read(ref _inputGesture)) return;
         _persistentMode = false;
         _capsLockService.PersistentModeActive = false;
         _cursorBlinkStoryboard?.Stop();
@@ -442,16 +523,27 @@ public partial class OverlayWindow : Window
         HintLabel.Visibility = Visibility.Collapsed;
 
         var session = _selectedTextSession;
-        var input = _capsLockService.Buffer.Trim();
+        var useTextInput = _holdInputMode;
+        if (useTextInput)
+        {
+            System.Windows.Input.Keyboard.Focus(this);
+            await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Background, ct);
+            if (session != _selectedTextSession || !_isShown || _isClosing
+                || gesture != Volatile.Read(ref _inputGesture)) return;
+        }
+        var input = useTextInput ? InputTextBox.Text.Trim() : _capsLockService.Buffer.Trim();
+        _holdInputMode = false;
+        _capsLockService.TextInputWindow = IntPtr.Zero;
 
         // If no typed input, fall back to the selected text grabbed at CapsLock-down
-        if (string.IsNullOrEmpty(input))
+        if (string.IsNullOrEmpty(input) && !_capsLockService.TypedWhileHeld)
         {
             var grabTask = _selectedTextTask;
             if (grabTask is not null)
             {
                 var selected = await AwaitSelectionAsync(grabTask);
-                if (session != _selectedTextSession) return;
+                if (session != _selectedTextSession || !_isShown
+                    || gesture != Volatile.Read(ref _inputGesture)) return;
                 _grabbedSelectedText = selected;
             }
             input = _grabbedSelectedText?.Trim() ?? string.Empty;
@@ -501,6 +593,12 @@ public partial class OverlayWindow : Window
     {
         Dispatcher.BeginInvoke(() =>
         {
+            if (_isClosing || !_isShown) return;
+            if (_holdInputMode)
+            {
+                SetInputText(buffer);
+                return;
+            }
             InputDisplay.Text = buffer;
             AdjustInputFontSize(buffer);
             UpdateCursorPosition();
@@ -572,7 +670,7 @@ public partial class OverlayWindow : Window
         };
 
         InputDisplay.FontSize = displayFont * fontScale;
-        InputTextBox.FontSize = textBoxFont * fontScale;
+        InputTextBox.FontSize = (_holdInputMode ? displayFont : textBoxFont) * fontScale;
         BlinkingCursor.Height = cursorH * fontScale;
     }
 
@@ -820,41 +918,19 @@ public partial class OverlayWindow : Window
     }
 
     /// <summary>
-    /// Forces the overlay to the foreground using Win32 AttachThreadInput trick.
-    /// WPF's Activate() alone may fail when another app holds foreground lock.
+    /// Requests activation without joining another application's input queue.
     /// </summary>
     private void ForceActivate()
     {
-        var hwnd = new WindowInteropHelper(this).Handle;
-        if (hwnd == IntPtr.Zero) return;
-
-        var foregroundHwnd = NativeMethods.GetForegroundWindow();
-        if (foregroundHwnd != IntPtr.Zero && foregroundHwnd != hwnd)
-        {
-            var foregroundThread = NativeMethods.GetWindowThreadProcessId(foregroundHwnd, out _);
-            var currentThread = NativeMethods.GetCurrentThreadId();
-
-            if (foregroundThread != currentThread)
-            {
-                NativeMethods.AttachThreadInput(foregroundThread, currentThread, true);
-                NativeMethods.SetForegroundWindow(hwnd);
-                NativeMethods.AttachThreadInput(foregroundThread, currentThread, false);
-            }
-            else
-            {
-                NativeMethods.SetForegroundWindow(hwnd);
-            }
-        }
-
         Activate();
     }
 
     /// <summary>
-    /// Realizes the HWND and runs one render pass off-screen so the first real activation
-    /// isn't slowed down by WPF's cold-start cost.
+    /// Realizes the HWND and lays out both input modes without activating the window.
     /// </summary>
     public void PreWarm()
     {
+        UpdateOverlaySize();
         Left = -32000;
         Top = -32000;
         Opacity = 0;
@@ -862,12 +938,46 @@ public partial class OverlayWindow : Window
         Show();
         Dispatcher.BeginInvoke(DispatcherPriority.ContextIdle, () =>
         {
-            if (!_isShown) Hide();
+            if (_isClosing) return;
+            if (!_isShown)
+            {
+                WarmUpInputSurface();
+                Hide();
+            }
             ShowActivated = true;
+            _idleWarmupTimer.Start();
         });
     }
 
-    private void ShowOverlay()
+    private void WarmUpInputSurface()
+    {
+        if (_isClosing || _isShown || Opacity != 0) return;
+
+        if (!_inputPrepared) PrepareInput();
+        UpdateOverlaySize();
+
+        InputDisplay.Visibility = Visibility.Collapsed;
+        InputTextBox.Visibility = Visibility.Visible;
+        try
+        {
+            LayoutInputSurface();
+        }
+        finally
+        {
+            InputTextBox.Visibility = Visibility.Collapsed;
+            InputDisplay.Visibility = Visibility.Visible;
+        }
+        LayoutInputSurface();
+    }
+
+    private void LayoutInputSurface()
+    {
+        RootGrid.Measure(new System.Windows.Size(Width, Height));
+        RootGrid.Arrange(new Rect(0, 0, Width, Height));
+        RootGrid.UpdateLayout();
+    }
+
+    private void UpdateOverlaySize()
     {
         var workArea = SystemParameters.WorkArea;
 
@@ -882,7 +992,12 @@ public partial class OverlayWindow : Window
 
         Width = Math.Min(baseW, workArea.Width * 0.9);
         Height = Math.Min(baseH, workArea.Height * 0.9);
+    }
 
+    private void ShowOverlay()
+    {
+        var workArea = SystemParameters.WorkArea;
+        UpdateOverlaySize();
         var pos = _settingsService.Current.PopupPosition;
         var margin = 20.0;
 
@@ -909,15 +1024,18 @@ public partial class OverlayWindow : Window
         ContentScale.ScaleY = 0.92;
         ContentTranslate.Y = 18;
 
-        // Always Hide+Show so the window moves to the current virtual desktop
         if (IsVisible)
         {
-            Hide();
+            var hwnd = new WindowInteropHelper(this).Handle;
+            var result = NativeMethods.DwmGetWindowAttribute(hwnd, NativeMethods.DWMWA_CLOAKED,
+                out var cloaked, sizeof(int));
+            if (result != 0 || (cloaked & NativeMethods.DWM_CLOAKED_SHELL) != 0)
+                Hide();
         }
-        Show();
+        if (!IsVisible) Show();
 
         ForceActivate();
-        InstallMouseHook();
+        _capsLockService.SetMouseMonitoring(true);
 
         // Entrance animation: fade + scale up + slide up
         var duration = TimeSpan.FromMilliseconds(220);
@@ -952,11 +1070,13 @@ public partial class OverlayWindow : Window
         _cts = null;
         _isShown = false;
         _persistentMode = false;
+        _holdInputMode = false;
+        _capsLockService.TextInputWindow = IntPtr.Zero;
         _userExplicitlySetMode = false;
         _lastLookupInput = null;
         _ignoreCacheForNextLookup = false;
         _capsLockService.PersistentModeActive = false;
-        UninstallMouseHook();
+        _capsLockService.SetMouseMonitoring(false);
         SetIgnoreCacheButtonVisible(false);
 
         // Reset TextBox/TextBlock visibility
@@ -982,6 +1102,7 @@ public partial class OverlayWindow : Window
             {
                 Left = -9999;
                 Top = -9999;
+                PrepareInput();
             }
         };
 
@@ -1005,74 +1126,47 @@ public partial class OverlayWindow : Window
     /// </summary>
     public void CloseForShutdown()
     {
+        _isClosing = true;
         _isShown = false;
+        _capsLockService.TextInputWindow = IntPtr.Zero;
+        _idleWarmupTimer.Stop();
         _autoHideTimer.Stop();
         _cursorBlinkStoryboard?.Stop();
         _cts?.Cancel();
         _cts?.Dispose();
         _cts = null;
-        UninstallMouseHook();
+        _capsLockService.SetMouseMonitoring(false);
 
         // Unsubscribe to avoid Deactivated handler firing during close
         _capsLockService.CapsLockPressed -= OnCapsLockPressed;
         _capsLockService.QuickTapReleased -= OnQuickTapReleased;
         _capsLockService.LongPressReleased -= OnLongPressReleased;
+        _capsLockService.HoldCancelled -= OnHoldCancelled;
         _capsLockService.BufferChanged -= OnBufferChanged;
         _capsLockService.EnterPressed -= OnEnterPressed;
         _capsLockService.ModeSwitchRequested -= OnModeSwitchRequested;
+        _capsLockService.MousePressed -= OnGlobalMousePressed;
 
         Close();
     }
 
-    #region Global Mouse Hook ??click-outside detection
-
-    private void InstallMouseHook()
+    private void OnGlobalMousePressed(object? sender, (int X, int Y) position)
     {
-        if (_mouseHookId != IntPtr.Zero) return;
-        _mouseHookProc = MouseHookCallback;
-        _mouseHookId = NativeMethods.SetWindowsHookEx(
-            NativeMethods.WH_MOUSE_LL, _mouseHookProc,
-            NativeMethods.CachedModuleHandle, 0);
-    }
-
-    private void UninstallMouseHook()
-    {
-        if (_mouseHookId == IntPtr.Zero) return;
-        NativeMethods.UnhookWindowsHookEx(_mouseHookId);
-        _mouseHookId = IntPtr.Zero;
-        _mouseHookProc = null;
-    }
-
-    private IntPtr MouseHookCallback(int nCode, IntPtr wParam, IntPtr lParam)
-    {
-        if (nCode >= 0 && _isShown)
+        var session = Volatile.Read(ref _selectedTextSession);
+        var gesture = Volatile.Read(ref _inputGesture);
+        Dispatcher.BeginInvoke(() =>
         {
-            var msg = (int)wParam;
-            if (msg is NativeMethods.WM_LBUTTONDOWN or NativeMethods.WM_RBUTTONDOWN
-                    or NativeMethods.WM_MBUTTONDOWN or NativeMethods.WM_NCLBUTTONDOWN)
+            if (_isClosing || !_isShown || session != _selectedTextSession
+                || gesture != Volatile.Read(ref _inputGesture)) return;
+            var hwnd = new WindowInteropHelper(this).Handle;
+            if (hwnd != IntPtr.Zero && NativeMethods.GetWindowRect(hwnd, out var rect)
+                && (position.X < rect.Left || position.X >= rect.Right
+                    || position.Y < rect.Top || position.Y >= rect.Bottom))
             {
-                var hookData = System.Runtime.InteropServices.Marshal.PtrToStructure<NativeMethods.MSLLHOOKSTRUCT>(lParam);
-                var hwnd = new WindowInteropHelper(this).Handle;
-                if (hwnd != IntPtr.Zero
-                    && NativeMethods.GetWindowRect(hwnd, out var rect)
-                    && !PtInRect(rect, hookData.pt))
-                {
-                    // Click was outside the overlay ??hide it on the UI thread
-                    Dispatcher.BeginInvoke(() =>
-                    {
-                        if (_isShown)
-                            HideOverlay();
-                    });
-                }
+                HideOverlay();
             }
-        }
-        return NativeMethods.CallNextHookEx(_mouseHookId, nCode, wParam, lParam);
+        });
     }
-
-    private static bool PtInRect(NativeMethods.RECT rect, NativeMethods.POINT pt)
-        => pt.X >= rect.Left && pt.X < rect.Right && pt.Y >= rect.Top && pt.Y < rect.Bottom;
-
-    #endregion
 
     private void RenderMarkdown(string markdown)
     {

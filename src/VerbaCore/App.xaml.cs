@@ -128,8 +128,8 @@ public partial class App : Application
         // Install CapsLock hook
         _capsLockService.Install();
 
-        // Warm the cold paths (WPF render pass, UIA/COM) so the first CapsLock press after
-        // a long idle period stays well inside the 300 ms low-level hook budget.
+        // Prepare both input layouts and UIA/COM before the first activation.
+        // The overlay maintains its input layout while idle.
         _overlayWindow.PreWarm();
         cursorText.PreWarm();
 

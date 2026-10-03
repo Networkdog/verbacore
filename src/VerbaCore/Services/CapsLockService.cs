@@ -23,6 +23,7 @@ public sealed class CapsLockService : IDisposable
 
     /// <summary>Private message posted to the hook thread to re-arm the hook.</summary>
     private const uint WM_APP_REARM = 0x8000 + 1;
+    private const uint WM_APP_MOUSE_MONITORING = 0x8000 + 2;
 
     /// <summary>
     /// Interval at which the hook is torn down and reinstalled. Guards against the hook
@@ -33,6 +34,9 @@ public sealed class CapsLockService : IDisposable
 
     private IntPtr _hookId = IntPtr.Zero;
     private NativeMethods.LowLevelKeyboardProc? _hookProc;
+    private IntPtr _mouseHookId;
+    private NativeMethods.LowLevelMouseProc? _mouseHookProc;
+    private volatile bool _mouseMonitoringEnabled;
     private Thread? _hookThread;
     private uint _hookThreadId;
     private System.Threading.Timer? _rearmTimer;
@@ -42,7 +46,8 @@ public sealed class CapsLockService : IDisposable
     private string _buffer = string.Empty;
     private long _capsDownTimestamp;
     private bool _typedWhileHeld;
-    /// <summary>Set when Esc cancels a CapsLock hold, to suppress the subsequent KeyUp event.</summary>
+    private IntPtr _textInputWindow;
+    /// <summary>Cancellation stays latched until the physical CapsLock key is released.</summary>
     private bool _escapeCancelledHold;
 
     /// <summary>
@@ -65,16 +70,23 @@ public sealed class CapsLockService : IDisposable
     /// The overlay should perform lookup and then auto-hide.
     /// </summary>
     public event EventHandler? LongPressReleased;
+    public event EventHandler? HoldCancelled;
 
     public event EventHandler<string>? BufferChanged;
     public event EventHandler<char>? CharTyped;
 
     /// <summary>Fired when Tab is pressed, requesting a lookup-mode switch.</summary>
     public event EventHandler? ModeSwitchRequested;
+    public event EventHandler<(int X, int Y)>? MousePressed;
 
     public bool IsCapsDown => Volatile.Read(ref _capsDown);
     public string Buffer => Volatile.Read(ref _buffer);
     public bool TypedWhileHeld => Volatile.Read(ref _typedWhileHeld);
+    public IntPtr TextInputWindow
+    {
+        get => Volatile.Read(ref _textInputWindow);
+        set => Volatile.Write(ref _textInputWindow, value);
+    }
 
     /// <summary>
     /// Set by OverlayWindow when persistent (quick-tap) mode is active.
@@ -95,7 +107,7 @@ public sealed class CapsLockService : IDisposable
         _hookThread = new Thread(() => HookThreadMain(ready))
         {
             IsBackground = true,
-            Name = "VerbaCore.KeyboardHook",
+            Name = "VerbaCore.InputHooks",
             // Overrunning the 300 ms hook timeout is what makes CapsLock fall through to
             // the OS, so this thread must not be starved by UI or background work.
             Priority = ThreadPriority.AboveNormal
@@ -111,6 +123,7 @@ public sealed class CapsLockService : IDisposable
     {
         _hookThreadId = NativeMethods.GetCurrentThreadId();
         _hookProc = HookCallback;
+        _mouseHookProc = MouseHookCallback;
         InstallHookCore();
 
         // Force CapsLock OFF after hook is installed
@@ -128,6 +141,12 @@ public sealed class CapsLockService : IDisposable
                 continue;
             }
 
+            if (msg.hwnd == IntPtr.Zero && msg.message == WM_APP_MOUSE_MONITORING)
+            {
+                UpdateMouseHookCore();
+                continue;
+            }
+
             NativeMethods.TranslateMessage(ref msg);
             NativeMethods.DispatchMessage(ref msg);
         }
@@ -142,13 +161,61 @@ public sealed class CapsLockService : IDisposable
             _hookProc!,
             NativeMethods.CachedModuleHandle,
             0);
+        UpdateMouseHookCore();
     }
 
     private void UninstallHookCore()
     {
+        if (_mouseHookId != IntPtr.Zero)
+        {
+            NativeMethods.UnhookWindowsHookEx(_mouseHookId);
+            _mouseHookId = IntPtr.Zero;
+        }
         if (_hookId == IntPtr.Zero) return;
         NativeMethods.UnhookWindowsHookEx(_hookId);
         _hookId = IntPtr.Zero;
+    }
+
+    public void SetMouseMonitoring(bool enabled)
+    {
+        if (_disposed) return;
+        _mouseMonitoringEnabled = enabled;
+        if (_hookThreadId != 0)
+            NativeMethods.PostThreadMessage(_hookThreadId, WM_APP_MOUSE_MONITORING, IntPtr.Zero, IntPtr.Zero);
+    }
+
+    private void UpdateMouseHookCore()
+    {
+        if (_mouseMonitoringEnabled && !_disposed)
+        {
+            if (_mouseHookId == IntPtr.Zero)
+                _mouseHookId = NativeMethods.SetWindowsHookEx(NativeMethods.WH_MOUSE_LL,
+                    _mouseHookProc!, NativeMethods.CachedModuleHandle, 0);
+        }
+        else if (_mouseHookId != IntPtr.Zero)
+        {
+            NativeMethods.UnhookWindowsHookEx(_mouseHookId);
+            _mouseHookId = IntPtr.Zero;
+        }
+    }
+
+    private IntPtr MouseHookCallback(int nCode, IntPtr wParam, IntPtr lParam)
+    {
+        try
+        {
+            if (nCode >= 0 && _mouseMonitoringEnabled
+                && (int)wParam is NativeMethods.WM_LBUTTONDOWN or NativeMethods.WM_RBUTTONDOWN
+                    or NativeMethods.WM_MBUTTONDOWN or NativeMethods.WM_NCLBUTTONDOWN)
+            {
+                var data = Marshal.PtrToStructure<NativeMethods.MSLLHOOKSTRUCT>(lParam);
+                MousePressed?.Invoke(this, (data.pt.X, data.pt.Y));
+            }
+        }
+        catch (Exception exception)
+        {
+            Debug.WriteLine($"[CapsLockService] Mouse hook exception: {exception}");
+        }
+        return NativeMethods.CallNextHookEx(_mouseHookId, nCode, wParam, lParam);
     }
 
     /// <summary>Hook-thread only. Skipped mid-keystroke so no event is lost.</summary>
@@ -175,6 +242,13 @@ public sealed class CapsLockService : IDisposable
     {
         _buffer = value;
         BufferChanged?.Invoke(this, _buffer);
+    }
+
+    public void UpdateTextInput(string value)
+    {
+        Volatile.Write(ref _buffer, value);
+        if (value.Length > 0)
+            Volatile.Write(ref _typedWhileHeld, true);
     }
 
     private IntPtr HookCallback(int nCode, IntPtr wParam, IntPtr lParam)
@@ -230,6 +304,7 @@ public sealed class CapsLockService : IDisposable
                     if (_escapeCancelledHold)
                     {
                         _escapeCancelledHold = false;
+                        _capsDown = false;
                         NativeMethods.ToggleCapsLockOff();
                         return (IntPtr)1;
                     }
@@ -256,7 +331,34 @@ public sealed class CapsLockService : IDisposable
                 }
             }
 
-            // While CapsLock is held, capture typed keys
+            if (_capsDown && _escapeCancelledHold)
+                return (IntPtr)1;
+
+            if (_capsDown && msg is NativeMethods.WM_KEYDOWN or NativeMethods.WM_SYSKEYDOWN)
+            {
+                if (vkCode == 0x09)
+                {
+                    ModeSwitchRequested?.Invoke(this, EventArgs.Empty);
+                    return (IntPtr)1;
+                }
+                if (vkCode == 0x1B)
+                {
+                    _buffer = string.Empty;
+                    _escapeCancelledHold = true;
+                    HoldCancelled?.Invoke(this, EventArgs.Empty);
+                    return (IntPtr)1;
+                }
+
+                var inputWindow = TextInputWindow;
+                if (inputWindow != IntPtr.Zero && NativeMethods.GetForegroundWindow() == inputWindow)
+                {
+                    if (vkCode is not (0x10 or 0x11 or 0x12 or 0x15 or >= 0xA0 and <= 0xA5))
+                        _typedWhileHeld = true;
+                    return NativeMethods.CallNextHookEx(_hookId, nCode, wParam, lParam);
+                }
+            }
+
+            // Buffer early input until the overlay's TextBox has focus.
             if (_capsDown && msg is NativeMethods.WM_KEYDOWN or NativeMethods.WM_SYSKEYDOWN)
             {
                 var ch = VkCodeToChar(vkCode);
@@ -280,24 +382,6 @@ public sealed class CapsLockService : IDisposable
                     // Only mark typed if there was actual content to delete
                     if (_buffer.Length > 0 || _typedWhileHeld)
                         _typedWhileHeld = true;
-                    return (IntPtr)1;
-                }
-
-                // Handle Tab — mode switch signal
-                if (vkCode == 0x09) // VK_TAB
-                {
-                    ModeSwitchRequested?.Invoke(this, EventArgs.Empty);
-                    return (IntPtr)1;
-                }
-
-                // Handle Escape — cancel
-                if (vkCode == 0x1B) // VK_ESCAPE
-                {
-                    _buffer = string.Empty;
-                    _capsDown = false;
-                    _escapeCancelledHold = true;
-                    BufferChanged?.Invoke(this, _buffer);
-                    LongPressReleased?.Invoke(this, EventArgs.Empty);
                     return (IntPtr)1;
                 }
 
@@ -422,5 +506,6 @@ public sealed class CapsLockService : IDisposable
 
         _hookThread = null;
         _hookProc = null;
+        _mouseHookProc = null;
     }
 }

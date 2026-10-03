@@ -21,6 +21,12 @@ internal static class NativeMethods
     [return: MarshalAs(UnmanagedType.Bool)]
     public static extern bool SetForegroundWindow(IntPtr hWnd);
 
+    public const int DWMWA_CLOAKED = 14;
+    public const int DWM_CLOAKED_SHELL = 2;
+
+    [DllImport("dwmapi.dll")]
+    public static extern int DwmGetWindowAttribute(IntPtr hwnd, int attribute, out int value, int size);
+
     // Low-level keyboard hook
     public const int WH_KEYBOARD_LL = 13;
     public const int WM_KEYDOWN = 0x0100;

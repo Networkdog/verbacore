@@ -60,7 +60,7 @@
                            MaxHeight="220"
                            Margin="0,0,0,8" />
 
-                <!-- IME-enabled input for persistent (quick-tap) mode - supports Korean -->
+                <!-- Native IME input shared by hold and quick-tap modes. -->
                 <TextBox Grid.Row="0"
                          x:Name="InputTextBox"
                          FontSize="64"

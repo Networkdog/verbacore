@@ -33,7 +33,7 @@ src/VerbaCore/
 │   ├── Strings.ko.xaml        — Korean UI string resources
 │   └── Strings.en.xaml        — English UI string resources
 ├── Services/
-│   ├── CapsLockService.cs     — Low-level keyboard hook on a dedicated message-pump thread, EnsoHold/QuickTap detection
+│   ├── CapsLockService.cs     — Keyboard/mouse hooks on a dedicated message-pump thread, EnsoHold/QuickTap detection
 │   ├── OpenAiService.cs       — 6-provider SSE streaming + Utf8JsonReader parsing
 │   ├── PromptBuilder.cs       — Mode-specific prompt generation + AutoMode selection
 │   ├── SettingsService.cs     — JSON settings load/save + DPAPI (source-generated)
@@ -45,6 +45,10 @@ src/VerbaCore/
     ├── NativeMethods.cs       — Win32 P/Invoke + CachedModuleHandle
     ├── UIA3Interop.cs         — COM UIA3 interface definitions
     └── Converters.cs          — XAML value converters
+
+tests/VerbaCore.PopupTests/
+├── VerbaCore.PopupTests.csproj # Standalone Windows popup regression harness
+└── Program.cs                 # Isolated foreground, idle, and working-set tests
 ```
 
 ## Coding Conventions
@@ -58,10 +62,14 @@ src/VerbaCore/
 
 ## Performance Patterns
 - **Dedicated hook thread**: `WH_KEYBOARD_LL` is installed on its own STA thread with a private `GetMessage` pump. Windows delivers the callback on the installing thread and lets the key through unhooked if it doesn't return within `LowLevelHooksTimeout` (300ms) — the UI thread is too easily blocked to host it. Keeping the callback off the UI thread is what makes CapsLock suppression reliable (no caps-mode toggling) even while the overlay/UIA initialize on first use
+- **Mouse hook isolation**: `WH_MOUSE_LL` uses the same dedicated input thread, never the WPF dispatcher. Movement immediately passes through; only button-down coordinates are posted asynchronously for outside-click checks. Monitoring installation/removal is posted to that thread, so UI rendering cannot stall system-wide mouse delivery
+- **Native hold-mode input**: both hold and quick-tap use the existing IME TextBox. While it owns keyboard focus and the overlay is foreground, the hook forwards text, Alt, and Hangul keys to Windows; the old character buffer is only a pre-focus fallback. Hold release drains queued input before reading the TextBox. Escape stays latched until CapsLock-up and raises cancellation, not lookup. Gesture IDs reject stale releases, focus callbacks, and outside clicks
 - **Non-blocking hook callbacks**: every `CapsLockService` event handler marshals with `Dispatcher.BeginInvoke`, never `Invoke`. Blocking inside the callback is what makes CapsLock fall through to plain case-toggling
 - **Hook re-arm watchdog**: the hook is reinstalled every 45s (skipped mid-keystroke), recovering from OS-dropped hooks and keeping the callback path resident in the working set
 - **Async UIA text grab**: `CursorTextService` runs all UIA3 calls on a dedicated STA worker; the overlay shows immediately and fills in the selection when it lands (800ms budget, stale requests dropped)
-- **Cold-start pre-warm**: `OverlayWindow.PreWarm()` (off-screen render pass of the visual tree) and `CursorTextService.PreWarm()` (UIA client init) run once at startup, so the first CapsLock activation pops up instantly instead of paying WPF/COM initialization cost on the critical path
+- **Idle popup readiness**: `OverlayWindow.PreWarm()` realizes the HWND and lays out both input modes without activation. A 30s `ContextIdle` timer maintains the layout only when the overlay is fully transparent and not in use; it performs no bitmap rendering, UIA calls, or foreground activation. `CloseForShutdown()` stops the timer and guards pending warm-up callbacks. `CursorTextService.PreWarm()` remains a startup-only UIA initialization
+- **Popup window reuse**: ordinary reactivation reuses the off-screen window instead of forcing `Hide()`/`Show()`. A shell-cloaked window (another virtual desktop) or an unavailable DWM query retains the hide/show fallback. Input reset runs after the exit animation and reuses an empty `FlowDocument`; localized labels are refreshed on activation
+- **Independent foreground activation**: use ordinary WPF activation without `AttachThreadInput`; another application's input queue must not be joined to the UI thread. UIA selection work is queued after the keyboard callback has posted to the dispatcher. Interactive focus and actual IME composition require an unlocked desktop check
 - **JSON source generation**: All Settings/History/API DTOs use `JsonSerializerContext` — eliminates reflection
 - **Live Markdown streaming**: results render as formatted Markdown *during* streaming (throttled to 200ms via `RenderThrottleMs`), not just at the end; `RenderMarkdown` also unwraps an outer ` ```markdown ` fence that some models (gpt-5.x) wrap the whole answer in. `_streamingRun`/`_streamingDoc` caching backs the plain-text fallback (`RenderPlainText`)
 - **SSE Utf8JsonReader**: Zero-alloc `Utf8JsonReader` instead of `JsonDocument` for streaming JSON parsing

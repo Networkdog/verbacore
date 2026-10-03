@@ -12,7 +12,7 @@ Use these names when communicating. When adding new elements, always assign a na
 ## Input Modes
 | Name | Description |
 |------|-------------|
-| **EnsoMode** | Hold CapsLock + type → lookup on release. Ephemeral mode |
+| **EnsoMode** | Hold CapsLock + type through the native IME TextBox → lookup on release. Ephemeral mode |
 | **PersistentMode** | Quick-tap CapsLock (<0.5s) to open TextBox + Enter to look up. Stays open until dismissed |
 
 ## Lookup Modes
@@ -28,6 +28,7 @@ Use these names when communicating. When adding new elements, always assign a na
 |------|-----|--------|
 | **EnsoHold** | `CapsLock` (hold ≥0.5s) | Open Overlay + EnsoMode, Lookup on release |
 | **QuickTap** | `CapsLock` (tap <0.5s) | Toggle PersistentMode |
+| **ImeSwitch** | Right `Alt` / Hangul key (Windows keyboard layout) | Korean/English switching in EnsoMode and PersistentMode |
 | **ModeSwitch** | `Tab` | Cycle DictMode → TransMode → AssistMode |
 | **DeleteChar** | `Backspace` | Delete last character from input buffer |
 | **Dismiss** | `Escape` | Close Overlay / cancel lookup |
@@ -38,7 +39,7 @@ Use these names when communicating. When adding new elements, always assign a na
 ## Services
 | Name | Class | Description |
 |------|-------|-------------|
-| **KeyHook** | `CapsLockService` | Low-level keyboard hook, EnsoHold/QuickTap detection, buffer management |
+| **KeyHook** | `CapsLockService` | Dedicated keyboard/mouse hook thread, EnsoHold/QuickTap detection, pre-focus buffer management |
 | **AiEngine** | `OpenAiService` | 6-provider SSE streaming + Utf8JsonReader parsing |
 | **PromptEngine** | `PromptBuilder` | Mode-specific prompt generation + AutoMode selection |
 | **ConfigStore** | `SettingsService` | JSON settings + DPAPI encryption (source-generated) |
@@ -68,9 +69,9 @@ Use these names when communicating. When adding new elements, always assign a na
 |------|--------|-------------|
 | **ModeLabel** | `ModeLabel` | Top — current mode icon + name |
 | **HintLabel** | `HintLabel` | "Tab: switch mode" hint text |
-| **InputDisplay** | `InputDisplay` | EnsoMode large typing display |
-| **InputBox** | `InputTextBox` | PersistentMode IME TextBox |
-| **BlinkingCursor** | `BlinkingCursor` | EnsoMode cursor (GPU Storyboard animation) |
+| **InputDisplay** | `InputDisplay` | Non-editable input display and layout preparation |
+| **InputBox** | `InputTextBox` | Shared EnsoMode/PersistentMode IME TextBox with native caret |
+| **BlinkingCursor** | `BlinkingCursor` | Legacy non-editable input cursor; hidden while the IME TextBox is active |
 | **ResultViewer** | `ResultViewer` | Markdown result display (FlowDocumentScrollViewer) |
 | **StatusBar** | `StatusLabel` | Bottom status message |
 | **LoadingSpinner** | `LoadingPanel` | Loading indicator during API calls |

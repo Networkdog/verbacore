@@ -115,7 +115,7 @@ That's it. The overlay fades in, the AI streams its answer, and the overlay fade
 
 | Method | How it feels |
 |---|---|
-| 🅰️ **CapsLock Hold** *(EnsoMode)* | Hold → type → release. Big, focused overlay. |
+| 🅰️ **CapsLock Hold** *(EnsoMode)* | Hold → type with native IME support → release to look up. Big, focused overlay. |
 | 🅰️ **CapsLock Tap** *(PersistentMode)* | Quick-tap (<0.5s) opens a persistent input box with full IME support. |
 | 🔥 **Global Hotkey** | `Ctrl+Alt+V` (customizable) from anywhere. |
 | 🖱️ **Cursor Text Grab** | Selected text under the cursor is auto-captured via UIA3 — works in Chromium / Electron / Office. |
@@ -126,6 +126,7 @@ That's it. The overlay fades in, the AI streams its answer, and the overlay fade
 |---|---|
 | `CapsLock` *(hold)* | Open overlay → look up on release |
 | `CapsLock` *(tap < 0.5s)* | Toggle PersistentMode |
+| Right `Alt` / Hangul key | Korean/English switching in either input mode, according to the installed Windows keyboard layout |
 | `Tab` | Cycle Dictionary ↔ Translate ↔ Assist |
 | `Backspace` | Delete last character |
 | `Esc` | Close overlay / cancel lookup |
@@ -242,6 +243,46 @@ cd verbacore
 dotnet run --project src/VerbaCore/VerbaCore.csproj
 ```
 
+### Popup regression checks
+
+Run on an unlocked Windows desktop:
+
+```powershell
+dotnet run --project tests/VerbaCore.PopupTests/VerbaCore.PopupTests.csproj -c Release
+```
+
+The isolated harness uses synthetic CapsLock events, a separate foreground window, and
+forced working-set eviction. It checks native window reuse, foreground focus, WPF text
+composition, idle preparation, shutdown, and a 250ms first-render-event budget. It does
+not load or save user settings/history, install a keyboard hook, or call an AI API.
+
+For the dedicated input-thread regression, first exit any running VerbaCore instance:
+
+```powershell
+dotnet run --project tests/VerbaCore.PopupTests/VerbaCore.PopupTests.csproj -c Release -- --input-hooks
+```
+
+This separate mode temporarily installs real hooks. It checks 400 repeated CapsLock
+messages, cancellation until physical key release, native Alt/Hangul/IME key routing,
+and mouse delivery while the caller does not pump UI messages. The mouse probe sends
+32 paired one-pixel moves before and after enabling the app's mouse hook; it does not
+click. An interactive desktop is required. Hooks are removed when the test exits.
+
+For a locked or unattended session:
+
+```powershell
+dotnet run --project tests/VerbaCore.PopupTests/VerbaCore.PopupTests.csproj -c Release -- --offscreen
+```
+
+Offscreen mode checks layout, window reuse, idle preparation, hold-text submission to
+a no-network test double, cancellation, stale gesture isolation, and outside-click
+dismissal. It writes a PNG to the temporary directory. `UI-ready` measures dispatched UI preparation; `offscreen-render`
+includes CPU bitmap rasterization. Neither measures pixels reaching the display, so the
+first-render budget and foreground/input checks are explicitly skipped in this mode.
+Real long-idle/resume behavior, physical CapsLock handling, IME composition, and virtual
+desktop switching still require interactive verification. The probe cannot guarantee
+latency under all Windows paging or scheduling conditions.
+
 ### Building the installer
 
 ```powershell
@@ -308,6 +349,10 @@ src/VerbaCore/
     ├── NativeMethods.cs       # Win32 P/Invoke + CachedModuleHandle
     ├── UIA3Interop.cs         # COM UIA3 interop definitions
     └── Converters.cs          # XAML value converters
+
+  tests/VerbaCore.PopupTests/
+  ├── VerbaCore.PopupTests.csproj # Standalone Windows popup regression harness
+  └── Program.cs                 # Isolated foreground, idle, and working-set tests
 ```
 
 </details>
