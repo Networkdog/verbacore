@@ -180,7 +180,7 @@ public sealed partial class OpenAiService : IOpenAiService
         var isReasoning = !string.IsNullOrEmpty(effort) && effort != "none";
         var model = _settings.Current.Model;
 
-        // Reasoning-capable models (o-series, gpt-5.x) don't support temperature
+        // Use the default temperature for o-series, gpt-5.x, and gpt-6.x models.
         var isReasoningModel = isReasoning || IsReasoningCapableModel(model);
 
         var request = new ChatCompletionRequest
@@ -224,7 +224,7 @@ public sealed partial class OpenAiService : IOpenAiService
 
     /// <summary>
     /// Detects reasoning-capable models that don't support the temperature parameter.
-    /// Covers o-series (o1, o3, o4-mini) and gpt-5.x reasoning models.
+    /// Covers o-series (o1, o3, o4-mini), gpt-5.x, and gpt-6.x models.
     /// </summary>
     private static bool IsReasoningCapableModel(string model)
     {
@@ -234,8 +234,8 @@ public sealed partial class OpenAiService : IOpenAiService
             && char.IsDigit(model[1]))
             return true;
 
-        // gpt-5.x models are reasoning-capable
-        if (model.StartsWith("gpt-5", StringComparison.OrdinalIgnoreCase))
+        if (model.StartsWith("gpt-5", StringComparison.OrdinalIgnoreCase)
+            || model.StartsWith("gpt-6", StringComparison.OrdinalIgnoreCase))
             return true;
 
         return false;

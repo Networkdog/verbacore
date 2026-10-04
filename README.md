@@ -142,7 +142,7 @@ That's it. The overlay fades in, the AI streams its answer, and the overlay fade
 - **🖋️ Typography system** — UI Font, Content Font, and Code Font defined once and shared everywhere.
 - **📊 Rich Markdown rendering** — headings, code blocks, blockquotes, lists, tables — all theme-aware.
 - **📋 Searchable history** — last 200 lookups, copyable, deletable, re-queryable.
-- **🧠 Reasoning models supported** — auto-detects o1, o3, o4-mini, GPT-5.x and routes parameters correctly.
+- **🧠 Reasoning models supported** — auto-detects o1, o3, o4-mini, GPT-5.x and GPT-6.x, omitting `temperature` to use the model's default.
 - **🚀 Start with Windows** — opt-in, registry-based, instant.
 - **🖥️ Per-Monitor V2 DPI** — crisp on high-DPI laptops *and* mixed-DPI monitor setups.
 - **🔒 Single-instance Mutex** — never two copies of the hook fighting.
@@ -242,6 +242,16 @@ git clone https://github.com/Networkdog/verbacore.git
 cd verbacore
 dotnet run --project src/VerbaCore/VerbaCore.csproj
 ```
+
+### API request regression checks
+
+```powershell
+dotnet run --project tests/VerbaCore.PopupTests/VerbaCore.PopupTests.csproj -c Release -- --api-requests
+```
+
+Checks serialized non-streaming and streaming requests, including GPT-6 temperature
+omission and existing model/reasoning settings, using a fake HTTP handler. No network,
+API key, keyboard hooks, or interactive desktop is needed.
 
 ### Popup regression checks
 

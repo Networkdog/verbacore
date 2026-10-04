@@ -1,8 +1,12 @@
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
+using System.Net;
+using System.Net.Http;
 using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Text;
+using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -24,6 +28,8 @@ internal static class Program
     [STAThread]
     private static int Main(string[] args)
     {
+        if (args.Contains("--api-requests"))
+            return RunApiRequestTestsAsync(CancellationToken.None).GetAwaiter().GetResult();
         if (args.Contains("--input-hooks")) return RunInputHookTests();
 
         if (args.Length == 2 && args[0] == "--host")
@@ -58,6 +64,95 @@ internal static class Program
         var app = new PopupTestApplication(args.Contains("--offscreen"));
         app.LoadResources();
         return app.Run();
+    }
+
+    private static async Task<int> RunApiRequestTestsAsync(CancellationToken ct)
+    {
+        (string Model, bool SupportsTemperature)[] models =
+        [
+            ("gpt-6", false),
+            ("gpt-6-mini", false),
+            ("gpt-6.1", false),
+            ("GPT-6", false),
+            ("gpt-5.2", false),
+            ("o3-mini", false),
+            ("gpt-4o-mini", true),
+            ("custom-model", true)
+        ];
+        var checkedRequests = 0;
+        try
+        {
+            foreach (var (model, supportsTemperature) in models)
+            foreach (var effort in new[] { "none", "", "low" })
+            foreach (var stream in new[] { false, true })
+            {
+                var settings = new SettingsService();
+                settings.Current.Model = model;
+                settings.Current.ReasoningEffort = effort;
+                using var handler = new CompletionRequestHandler();
+                using var client = new HttpClient(handler);
+                var service = new OpenAiService(client, settings, new PromptBuilder());
+                var result = new StringBuilder();
+                if (stream)
+                {
+                    await foreach (var chunk in service.StreamCompletionAsync(
+                        "hello", LookupMode.Dictionary, "Korean", "English", ct))
+                        result.Append(chunk);
+                }
+                else
+                {
+                    result.Append(await service.GetCompletionAsync(
+                        "hello", LookupMode.Dictionary, "Korean", "English", ct));
+                }
+
+                using var payload = JsonDocument.Parse(handler.RequestJson!);
+                var root = payload.RootElement;
+                var context = $"model={model}, effort='{effort}', stream={stream}";
+                var isReasoning = !string.IsNullOrEmpty(effort) && effort != "none";
+                var hasTemperature = root.TryGetProperty("temperature", out var temperature);
+                if (hasTemperature != (supportsTemperature && !isReasoning)
+                    || (hasTemperature && temperature.GetDouble() != 0.3))
+                    throw new InvalidOperationException($"Incorrect temperature payload: {context}");
+                if (root.GetProperty("model").GetString() != model
+                    || root.GetProperty("stream").GetBoolean() != stream
+                    || root.GetProperty("messages")[0].GetProperty("role").GetString() != (isReasoning ? "developer" : "system"))
+                    throw new InvalidOperationException($"Unrelated request fields changed: {context}");
+                var hasEffort = root.TryGetProperty("reasoning_effort", out var sentEffort);
+                if (hasEffort != isReasoning || (hasEffort && sentEffort.GetString() != effort))
+                    throw new InvalidOperationException($"Reasoning effort changed: {context}");
+                if (result.ToString() != "ok" || handler.RequestCount != 1)
+                    throw new InvalidOperationException($"Response handling changed: {context}");
+                checkedRequests++;
+            }
+            Console.WriteLine($"PASS: {checkedRequests} serialized completion/streaming requests; GPT-6 omits temperature and existing models keep their settings. No network used.");
+            return 0;
+        }
+        catch (Exception exception)
+        {
+            Console.Error.WriteLine(exception);
+            return 1;
+        }
+    }
+
+    private sealed class CompletionRequestHandler : HttpMessageHandler
+    {
+        public string? RequestJson { get; private set; }
+        public int RequestCount { get; private set; }
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
+        {
+            RequestJson = await request.Content!.ReadAsStringAsync(ct);
+            RequestCount++;
+            using var payload = JsonDocument.Parse(RequestJson);
+            var stream = payload.RootElement.GetProperty("stream").GetBoolean();
+            var body = stream
+                ? "data: {\"choices\":[{\"delta\":{\"content\":\"ok\"}}]}\n\ndata: [DONE]\n\n"
+                : """{"choices":[{"message":{"content":"ok"}}]}""";
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(body, Encoding.UTF8, stream ? "text/event-stream" : "application/json")
+            };
+        }
     }
 
     private static int RunInputHookTests()
