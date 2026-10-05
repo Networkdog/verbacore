@@ -174,4 +174,27 @@ public sealed class LookupCacheService
         var hash = SHA256.HashData(bytes);
         return Convert.ToHexString(hash);
     }
+
+    public static string MakeKey(AppSettings settings, LookupMode mode, string src, string tgt, string input)
+    {
+        var normalized = input.Trim();
+        if (mode == LookupMode.Dictionary) normalized = normalized.ToLowerInvariant();
+        var endpoint = settings.Provider switch
+        {
+            ApiProvider.AzureOpenAI or ApiProvider.Foundry => settings.AzureEndpoint,
+            ApiProvider.Custom => settings.CustomEndpoint,
+            _ => string.Empty
+        };
+        string[] parts =
+        [
+            "request-v2", settings.Provider.ToString(), endpoint.Trim().TrimEnd('/'), settings.AzureApiVersion,
+            OpenAiService.GetProtocol(settings).ToString(), settings.Model, settings.InstructionRole.ToString(),
+            OpenAiService.GetReasoningMode(settings).ToString(), settings.ReasoningEffort,
+            settings.TokenLimitParameter.ToString(), settings.MaxOutputTokens.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            settings.ThinkingBudgetTokens.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            mode.ToString(), src, tgt, normalized
+        ];
+        var bytes = JsonSerializer.SerializeToUtf8Bytes(parts, CacheJsonContext.Default.StringArray);
+        return Convert.ToHexString(SHA256.HashData(bytes));
+    }
 }

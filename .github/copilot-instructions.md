@@ -8,7 +8,7 @@ VerbaCore is a lightweight Windows desktop AI dictionary & translation app. It l
 - **UI**: WPF + WPF-UI 3.x (SettingsPanel) / raw WPF (Overlay)
 - **Architecture**: MVVM (CommunityToolkit.Mvvm) — settings; code-behind — overlay
 - **DI**: Microsoft.Extensions.DependencyInjection
-- **AI**: HttpClient SSE streaming (6 providers: OpenAI, AzureOpenAI, Anthropic, Google, OpenRouter, Custom) — Model field doubles as Azure Deployment Name
+- **AI**: HttpClient SSE streaming (7 providers: OpenAI, AzureOpenAI, Anthropic, Google, OpenRouter, Custom, Foundry); explicit Chat Completions / Anthropic Messages protocol; Model field doubles as Azure Deployment Name
 - **Input**: CapsLock quasimodal keyboard hook (WH_KEYBOARD_LL)
 - **Tray**: System.Windows.Forms.NotifyIcon
 - **Settings**: JSON + DPAPI encryption (`%AppData%\VerbaCore\settings.json`)
@@ -34,21 +34,28 @@ src/VerbaCore/
 │   └── Strings.en.xaml        — English UI string resources
 ├── Services/
 │   ├── CapsLockService.cs     — Keyboard/mouse hooks on a dedicated message-pump thread, EnsoHold/QuickTap detection
-│   ├── OpenAiService.cs       — 6-provider SSE streaming + Utf8JsonReader parsing
+│   ├── OpenAiService.cs       — Protocol-aware requests, validation, responses, and SSE parsing
 │   ├── PromptBuilder.cs       — Mode-specific prompt generation + AutoMode selection
 │   ├── SettingsService.cs     — JSON settings load/save + DPAPI (source-generated)
 │   ├── HistoryService.cs      — JSON history + debounced save (source-generated)
 │   ├── HotkeyService.cs       — NHotkey global hotkey registration/unregistration
 │   ├── LocalizationService.cs — Runtime UI language switching via ResourceDictionary swap
-    └── CursorTextService.cs   — COM UIA3 selected text extraction (+ startup PreWarm)
+│   ├── CursorTextService.cs   — Captured-window selection, MTA worker, cancellation/deadline (+ startup PreWarm)
+│   ├── OfficeSelectionReader.cs — Word/Outlook editor, Excel cells, PowerPoint text via OBJID_NATIVEOM
+│   └── AccessibleSelectionReader.cs — MSAA/IAccessible2 selected ranges for Chromium/Electron
 └── Helpers/
     ├── NativeMethods.cs       — Win32 P/Invoke + CachedModuleHandle
     ├── UIA3Interop.cs         — COM UIA3 interface definitions
+    ├── SelectionInterop.cs    — Source window/focus snapshot, MSAA/native OM and IAccessible2 interop
     └── Converters.cs          — XAML value converters
 
 tests/VerbaCore.PopupTests/
 ├── VerbaCore.PopupTests.csproj # Standalone Windows popup regression harness
-└── Program.cs                 # Isolated foreground, idle, and working-set tests
+└── Program.cs                 # Popup, API contract, settings UI, and cache regression checks
+
+docs/
+├── foundry-api-compatibility.md # API research, settings, and compatibility boundaries
+└── selected-text-compatibility.md # Clipboard-free selection research, app prerequisites, and verified boundaries
 ```
 
 ## Coding Conventions
@@ -59,6 +66,7 @@ tests/VerbaCore.PopupTests/
 - All async methods must accept `CancellationToken`
 - P/Invoke uses `DllImport` (not LibraryImport — avoids AllowUnsafeBlocks)
 - When adding new JSON DTOs, register with `[JsonSerializable]` on an existing `JsonSerializerContext` or create a new one
+- API options are explicit contracts, not model-name heuristics. Omit optional sampling/reasoning/token overrides by default (Messages still requires max_tokens). Keep protocol, instruction role, thinking schema, and output-token parameter independent; validate incompatible combinations before HTTP. Do not automatically retry with altered semantics. See `docs/foundry-api-compatibility.md`
 
 ## Performance Patterns
 - **Dedicated hook thread**: `WH_KEYBOARD_LL` is installed on its own STA thread with a private `GetMessage` pump. Windows delivers the callback on the installing thread and lets the key through unhooked if it doesn't return within `LowLevelHooksTimeout` (300ms) — the UI thread is too easily blocked to host it. Keeping the callback off the UI thread is what makes CapsLock suppression reliable (no caps-mode toggling) even while the overlay/UIA initialize on first use
@@ -66,13 +74,14 @@ tests/VerbaCore.PopupTests/
 - **Native hold-mode input**: both hold and quick-tap use the existing IME TextBox. While it owns keyboard focus and the overlay is foreground, the hook forwards text, Alt, and Hangul keys to Windows; the old character buffer is only a pre-focus fallback. Hold release drains queued input before reading the TextBox. Escape stays latched until CapsLock-up and raises cancellation, not lookup. Gesture IDs reject stale releases, focus callbacks, and outside clicks
 - **Non-blocking hook callbacks**: every `CapsLockService` event handler marshals with `Dispatcher.BeginInvoke`, never `Invoke`. Blocking inside the callback is what makes CapsLock fall through to plain case-toggling
 - **Hook re-arm watchdog**: the hook is reinstalled every 45s (skipped mid-keystroke), recovering from OS-dropped hooks and keeping the callback path resident in the working set
-- **Async UIA text grab**: `CursorTextService` runs all UIA3 calls on a dedicated STA worker; the overlay shows immediately and fills in the selection when it lands (800ms budget, stale requests dropped)
+- **Async selected-text grab**: `CursorTextService` captures source HWND/process/native focus before overlay activation and reads UIA, Office native OM, and MSAA/IAccessible2 on a dedicated MTA worker. The overlay shows immediately; requests have a 2s caller deadline, bounded traversal, supersession, and hide/shutdown cancellation. No clipboard or synthetic copy; no document/value/name fallback for selections. Filter password controls and IA2 object markers; retain the 2,000-character return bound. In-flight third-party COM calls cannot be forcibly interrupted; disposal leaves queue cleanup to the worker. VS Code may require `editor.accessibilitySupport: on`; never change it silently. See `docs/selected-text-compatibility.md` for actual verification and limitations
 - **Idle popup readiness**: `OverlayWindow.PreWarm()` realizes the HWND and lays out both input modes without activation. A 30s `ContextIdle` timer maintains the layout only when the overlay is fully transparent and not in use; it performs no bitmap rendering, UIA calls, or foreground activation. `CloseForShutdown()` stops the timer and guards pending warm-up callbacks. `CursorTextService.PreWarm()` remains a startup-only UIA initialization
 - **Popup window reuse**: ordinary reactivation reuses the off-screen window instead of forcing `Hide()`/`Show()`. A shell-cloaked window (another virtual desktop) or an unavailable DWM query retains the hide/show fallback. Input reset runs after the exit animation and reuses an empty `FlowDocument`; localized labels are refreshed on activation
-- **Independent foreground activation**: use ordinary WPF activation without `AttachThreadInput`; another application's input queue must not be joined to the UI thread. UIA selection work is queued after the keyboard callback has posted to the dispatcher. Interactive focus and actual IME composition require an unlocked desktop check
+- **Independent foreground activation**: never join another application's input queue with `AttachThreadInput`. Quick tap verifies foreground HWND, native focus, and TextBox keyboard focus with at most six asynchronous attempts. A failed activation may use one left-Alt down/up pair on the current input desktop, only with no modifiers or CapsLock held; never use this during pre-warm. Hide, shutdown, a newer gesture, or a different foreground app ends recovery. UIA selection work remains outside the keyboard callback
 - **JSON source generation**: All Settings/History/API DTOs use `JsonSerializerContext` — eliminates reflection
 - **Live Markdown streaming**: results render as formatted Markdown *during* streaming (throttled to 200ms via `RenderThrottleMs`), not just at the end; `RenderMarkdown` also unwraps an outer ` ```markdown ` fence that some models (gpt-5.x) wrap the whole answer in. `_streamingRun`/`_streamingDoc` caching backs the plain-text fallback (`RenderPlainText`)
-- **SSE Utf8JsonReader**: Zero-alloc `Utf8JsonReader` instead of `JsonDocument` for streaming JSON parsing
+- **SSE Utf8JsonReader**: Scope parsing to the selected protocol's final-text paths, compare property names with UTF-8 spans, and avoid a `JsonDocument` per chunk. Assemble SSE data frames; ignore reasoning/tool payloads but surface errors, truncation, and incomplete termination before saving a successful lookup
+- **Request-specific cache**: source-generated cache identity includes endpoint, protocol, deployment, and explicit request options, never API keys. Do not reuse results across different request contracts
 - **Cursor animation GPU acceleration**: WPF Storyboard on composition thread instead of DispatcherTimer
 - **Module handle caching**: `NativeMethods.CachedModuleHandle` avoids Process allocation on every hook install
 - **History debounced save**: 500ms debounce on consecutive lookups to minimize I/O
@@ -81,7 +90,7 @@ tests/VerbaCore.PopupTests/
 
 ## Key Architecture Decisions
 1. **CapsLock quasimodal**: `SetWindowsHookEx` WH_KEYBOARD_LL intercepts CapsLock on a **dedicated message-pump thread** (never blocked by UI work → reliable suppression, no caps toggling). EnsoHold(≥0.5s) vs QuickTap(<0.5s) distinction. Tab raises `ModeSwitchRequested` instead of round-tripping through the buffer
-2. **6-provider SSE**: HttpClient + `ResponseHeadersRead` + `StreamReader` → `Utf8JsonReader` chunk parsing
+2. **7-provider SSE**: HttpClient + `ResponseHeadersRead` + `StreamReader` → protocol-aware `Utf8JsonReader` parsing
 3. **3 Lookup Modes**: Dictionary(≤3 words), Translate(>3 words), Assist(code/URL/formula/non-language) — `PromptBuilder.AutoSelectMode()` auto-selects
 4. **Overlay**: Transparent `Window` + `AllowsTransparency="True"`. 220ms fade in / 180ms fade out. Global mouse hook for outside-click detection
 5. **System tray**: `NotifyIcon` + `ShutdownMode="OnExplicitShutdown"`. Only tray exit terminates the app

@@ -40,11 +40,13 @@ Use these names when communicating. When adding new elements, always assign a na
 | Name | Class | Description |
 |------|-------|-------------|
 | **KeyHook** | `CapsLockService` | Dedicated keyboard/mouse hook thread, EnsoHold/QuickTap detection, pre-focus buffer management |
-| **AiEngine** | `OpenAiService` | 6-provider SSE streaming + Utf8JsonReader parsing |
+| **AiEngine** | `OpenAiService` | 7-provider protocol-aware requests, validation, responses, and SSE parsing |
 | **PromptEngine** | `PromptBuilder` | Mode-specific prompt generation + AutoMode selection |
 | **ConfigStore** | `SettingsService` | JSON settings + DPAPI encryption (source-generated) |
 | **HistoryStore** | `HistoryService` | JSON history + debounced save (source-generated) |
-| **TextGrabber** | `CursorTextService` | COM UIA3 selected text extraction |
+| **TextGrabber** | `CursorTextService` | Clipboard-free captured-window selection with UIA, native Office, and IAccessible2 on a bounded MTA worker |
+| **OfficeSelection** | `OfficeSelectionReader` | Native document-window selection for Word/Outlook editor, Excel cells, and PowerPoint text |
+| **AccessibleSelection** | `AccessibleSelectionReader` | MSAA/IAccessible2 selected ranges, including Chromium renderer discovery |
 | **GlobalHotkeyService** | `HotkeyService` | NHotkey global hotkey registration/unregistration |
 
 ## Models
@@ -58,11 +60,25 @@ Use these names when communicating. When adding new elements, always assign a na
 ## Enums
 | Name | Enum | Values |
 |------|------|--------|
-| **Provider** | `ApiProvider` | `OpenAI`, `AzureOpenAI`, `Anthropic`, `Google`, `OpenRouter`, `Custom` |
+| **Provider** | `ApiProvider` | `OpenAI`, `AzureOpenAI`, `Anthropic`, `Google`, `OpenRouter`, `Custom`, `Foundry` |
+| **ApiProtocol** | `InferenceProtocol` | `ChatCompletions`, `AnthropicMessages` |
+| **ReasoningOptions** | `ReasoningMode` | `ModelDefault`, `OpenAiEffort`, `ThinkingEnabled`, `ThinkingDisabled`, `AnthropicAdaptive`, `AnthropicBudgeted` |
+| **InstructionRole** | `InstructionRole` | `System`, `Developer`, `User` |
+| **TokenParameter** | `OutputTokenParameter` | `ModelDefault`, `MaxCompletionTokens`, `MaxTokens` |
 | **Position** | `OverlayPosition` | `TopLeft` through `BottomRight` (9 positions) |
 | **Size** | `OverlaySize` | `Small`, `Medium`, `Large` |
 | **Theme** | `ThemeMode` | `System`, `Light`, `Dark` |
 | **Mode** | `LookupMode` | `Dictionary`, `Translate`, `Assist` |
+
+## API Settings
+| Name | Binding | Description |
+|------|---------|-------------|
+| **ApiProtocol** | `Protocol` | Explicit Foundry/Custom request and response format |
+| **RequestOptions** | Advanced request options Expander | Collapsed by default; model-specific overrides |
+| **ReasoningOptions** | `SelectedReasoningMode`, `ReasoningEffort` | Explicit reasoning schema and optional effort |
+| **TokenLimit** | `TokenLimitParameter`, `MaxOutputTokens` | Optional Chat limit or required Messages limit |
+| **ThinkingBudget** | `ThinkingBudgetTokens` | Budgeted Claude thinking, below the output limit |
+| **InstructionRole** | `SelectedInstructionRole` | Independent Chat Completions instruction role |
 
 ## UI Regions (Overlay)
 | Name | x:Name | Description |

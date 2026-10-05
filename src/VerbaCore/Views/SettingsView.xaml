@@ -34,6 +34,14 @@
                 </StackPanel>
             </ui:Card>
 
+            <ui:Card Margin="0,0,0,8" Visibility="{Binding ShowProtocol, Converter={StaticResource BoolToVisibilityConverter}}">
+                <StackPanel>
+                    <TextBlock Text="{DynamicResource Settings_ApiProtocol}" Margin="0,0,0,4" FontSize="12" Opacity="0.7" />
+                    <ComboBox ItemsSource="{Binding AvailableProtocols}" DisplayMemberPath="Value" SelectedValuePath="Key"
+                              SelectedValue="{Binding Protocol}" />
+                </StackPanel>
+            </ui:Card>
+
             <ui:Card Margin="0,0,0,8">
                 <StackPanel>
                     <TextBlock Text="API Key" Margin="0,0,0,4" FontSize="12" Opacity="0.7" />
@@ -51,7 +59,6 @@
                                Text="{DynamicResource Settings_ModelAzure}"
                                Visibility="{Binding IsAzure, Converter={StaticResource BoolToVisibilityConverter}}" />
                     <ComboBox ItemsSource="{Binding AvailableModels}"
-                              SelectedItem="{Binding SelectedModel}"
                               IsEditable="True"
                               Text="{Binding SelectedModel, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                     <TextBlock FontSize="10" Opacity="0.5" Margin="0,4,0,0"
@@ -63,34 +70,17 @@
                 </StackPanel>
             </ui:Card>
 
-            <ui:Card Margin="0,0,0,8">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                        <TextBlock Text="{DynamicResource Settings_ReasoningEffort}" FontSize="13" />
-                        <TextBlock Text="{DynamicResource Settings_ReasoningEffortHint}" FontSize="10" Opacity="0.5" />
-                    </StackPanel>
-                    <ComboBox Grid.Column="1"
-                              ItemsSource="{Binding AvailableReasoningEfforts}"
-                              SelectedItem="{Binding ReasoningEffort}"
-                              MinWidth="100" />
-                </Grid>
-            </ui:Card>
-
             <!-- Azure OpenAI Settings -->
             <StackPanel Visibility="{Binding IsAzure, Converter={StaticResource BoolToVisibilityConverter}}">
                 <ui:Card Margin="0,0,0,8">
                     <StackPanel>
                         <TextBlock Text="{DynamicResource Settings_AzureEndpoint}" Margin="0,0,0,4" FontSize="12" Opacity="0.7" />
                         <ui:TextBox Text="{Binding AzureEndpoint, Mode=TwoWay}"
-                                    PlaceholderText="https://your-resource.openai.azure.com" />
+                                    PlaceholderText="{Binding AzureEndpointPlaceholder}" />
                     </StackPanel>
                 </ui:Card>
 
-                <ui:Card Margin="0,0,0,8">
+                <ui:Card Margin="0,0,0,8" Visibility="{Binding IsLegacyAzure, Converter={StaticResource BoolToVisibilityConverter}}">
                     <StackPanel>
                         <TextBlock Text="{DynamicResource Settings_AzureApiVersion}" Margin="0,0,0,4" FontSize="12" Opacity="0.7" />
                         <ui:TextBox Text="{Binding AzureApiVersion, Mode=TwoWay}"
@@ -110,6 +100,37 @@
                     </StackPanel>
                 </ui:Card>
             </StackPanel>
+
+            <Expander Header="{DynamicResource Settings_RequestOptions}" Margin="0,4,0,12" IsExpanded="False">
+                <StackPanel Margin="0,8,0,0">
+                    <StackPanel Margin="0,0,0,12" Visibility="{Binding IsMessages, Converter={StaticResource BoolToVisibilityConverter}, ConverterParameter=Invert}">
+                        <TextBlock Text="{DynamicResource Settings_InstructionRole}" FontSize="12" Margin="0,0,0,4" />
+                        <ComboBox ItemsSource="{Binding AvailableInstructionRoles}" DisplayMemberPath="Value" SelectedValuePath="Key"
+                                  SelectedValue="{Binding SelectedInstructionRole}" />
+                    </StackPanel>
+                    <StackPanel Margin="0,0,0,12" Visibility="{Binding IsMessages, Converter={StaticResource BoolToVisibilityConverter}, ConverterParameter=Invert}">
+                        <TextBlock Text="{DynamicResource Settings_TokenParameter}" FontSize="12" Margin="0,0,0,4" />
+                        <ComboBox ItemsSource="{Binding AvailableTokenParameters}" DisplayMemberPath="Value" SelectedValuePath="Key"
+                                  SelectedValue="{Binding TokenLimitParameter}" />
+                    </StackPanel>
+                    <StackPanel Margin="0,0,0,12" Visibility="{Binding ShowTokenLimit, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <TextBlock Text="{DynamicResource Settings_MaxOutputTokens}" FontSize="12" Margin="0,0,0,4" />
+                        <ui:NumberBox Value="{Binding MaxOutputTokens, Mode=TwoWay}" Minimum="1" Maximum="1048576" />
+                    </StackPanel>
+                    <TextBlock Text="{DynamicResource Settings_ReasoningMode}" FontSize="12" Margin="0,0,0,4" />
+                    <ComboBox ItemsSource="{Binding AvailableReasoningModes}" DisplayMemberPath="Value" SelectedValuePath="Key"
+                              SelectedValue="{Binding SelectedReasoningMode}" Margin="0,0,0,12" />
+                    <StackPanel Margin="0,0,0,12" Visibility="{Binding ShowReasoningEffort, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <TextBlock Text="{DynamicResource Settings_ReasoningEffort}" FontSize="12" Margin="0,0,0,4" />
+                        <ComboBox ItemsSource="{Binding AvailableReasoningEfforts}" DisplayMemberPath="Value" SelectedValuePath="Key"
+                                  SelectedValue="{Binding ReasoningEffort}" ToolTip="{DynamicResource Settings_ReasoningEffortHint}" />
+                    </StackPanel>
+                    <StackPanel Margin="0,0,0,12" Visibility="{Binding ShowThinkingBudget, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <TextBlock Text="{DynamicResource Settings_ThinkingBudget}" FontSize="12" Margin="0,0,0,4" />
+                        <ui:NumberBox Value="{Binding ThinkingBudgetTokens, Mode=TwoWay}" Minimum="1024" Maximum="1048575" />
+                    </StackPanel>
+                </StackPanel>
+            </Expander>
 
             <!-- Input Settings -->
             <TextBlock Text="{DynamicResource Settings_LanguageSection}" FontSize="16" FontWeight="SemiBold" Margin="0,16,0,12" />

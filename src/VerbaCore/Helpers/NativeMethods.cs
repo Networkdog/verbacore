@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using System.Text;
 
 namespace VerbaCore.Helpers;
 
@@ -20,6 +21,103 @@ internal static class NativeMethods
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static extern bool SetForegroundWindow(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    public static extern IntPtr SetFocus(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    public static extern IntPtr GetFocus();
+
+    [DllImport("user32.dll")]
+    private static extern short GetAsyncKeyState(int virtualKey);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern uint SendInput(uint count, INPUT[] inputs, int size);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct INPUT
+    {
+        public uint Type;
+        public INPUTUNION Data;
+    }
+
+    [StructLayout(LayoutKind.Explicit)]
+    private struct INPUTUNION
+    {
+        [FieldOffset(0)] public KEYBDINPUT Keyboard;
+        [FieldOffset(0)] public MOUSEINPUT Mouse;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct KEYBDINPUT
+    {
+        public ushort VirtualKey;
+        public ushort ScanCode;
+        public uint Flags;
+        public uint Time;
+        public UIntPtr ExtraInfo;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct MOUSEINPUT
+    {
+        public int DeltaX;
+        public int DeltaY;
+        public uint MouseData;
+        public uint Flags;
+        public uint Time;
+        public UIntPtr ExtraInfo;
+    }
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern IntPtr OpenInputDesktop(uint flags, [MarshalAs(UnmanagedType.Bool)] bool inherit, uint access);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetThreadDesktop(uint threadId);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetUserObjectInformation(IntPtr handle, int index, StringBuilder value, uint length, out uint required);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool CloseDesktop(IntPtr desktop);
+
+    internal static bool IsInputDesktopCurrent()
+    {
+        var desktop = OpenInputDesktop(0, false, 0x0001);
+        if (desktop == IntPtr.Zero) return false;
+        try
+        {
+            var inputName = new StringBuilder(256);
+            var currentName = new StringBuilder(256);
+            return GetUserObjectInformation(desktop, 2, inputName, 512, out _)
+                && GetUserObjectInformation(GetThreadDesktop(GetCurrentThreadId()), 2, currentName, 512, out _)
+                && inputName.ToString() == currentName.ToString();
+        }
+        finally
+        {
+            CloseDesktop(desktop);
+        }
+    }
+
+    internal static bool TryUnlockForegroundForQuickTap()
+    {
+        if (!IsInputDesktopCurrent()) return false;
+        foreach (var virtualKey in new[] { 0x10, 0x11, 0x12, 0x14, 0x5B, 0x5C })
+            if ((GetAsyncKeyState(virtualKey) & 0x8000) != 0) return false;
+
+        var key = new KEYBDINPUT { VirtualKey = 0xA4, ScanCode = 0x38, ExtraInfo = new UIntPtr(0x56434647) };
+        INPUT[] inputs =
+        [
+            new() { Type = 1, Data = new INPUTUNION { Keyboard = key } },
+            new() { Type = 1, Data = new INPUTUNION { Keyboard = key } }
+        ];
+        inputs[1].Data.Keyboard.Flags = KEYEVENTF_KEYUP;
+        var sent = SendInput(2, inputs, Marshal.SizeOf<INPUT>());
+        if (sent == 1) SendInput(1, [inputs[1]], Marshal.SizeOf<INPUT>());
+        return sent == 2;
+    }
 
     public const int DWMWA_CLOAKED = 14;
     public const int DWM_CLOAKED_SHELL = 2;

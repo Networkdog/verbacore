@@ -20,9 +20,7 @@
 リクエストがタイムアウトしました。もう一度お試しください。</sys:String>
     <sys:String x:Key="Overlay_ErrorMarkdown">## ❌ エラー
 
-{0}
-
-API キーと設定をご確認ください。</sys:String>
+{0}</sys:String>
 
     <!-- Settings Window -->
     <sys:String x:Key="Settings_Title">VerbaCore 設定</sys:String>
@@ -35,9 +33,17 @@ API キーと設定をご確認ください。</sys:String>
     <sys:String x:Key="Settings_Model">モデル</sys:String>
     <sys:String x:Key="Settings_ModelAzure">モデル (Deployment Name)</sys:String>
     <sys:String x:Key="Settings_ModelHint">リストから選択するか直接入力できます</sys:String>
-    <sys:String x:Key="Settings_ModelAzureHint">Azure OpenAI のデプロイ名を入力してください</sys:String>
+    <sys:String x:Key="Settings_ModelAzureHint">Azure のデプロイ名</sys:String>
     <sys:String x:Key="Settings_ReasoningEffort">Reasoning Effort</sys:String>
-    <sys:String x:Key="Settings_ReasoningEffortHint">GPT-5、o1、o3 などの推論モデルの思考レベルを調整</sys:String>
+    <sys:String x:Key="Settings_ReasoningEffortHint">対応する値はモデルとバージョンによって異なります。</sys:String>
+    <sys:String x:Key="Settings_ApiProtocol">API 形式</sys:String>
+    <sys:String x:Key="Settings_RequestOptions">リクエストの詳細設定</sys:String>
+    <sys:String x:Key="Settings_ModelDefaults">モデルの既定値</sys:String>
+    <sys:String x:Key="Settings_InstructionRole">指示メッセージのロール</sys:String>
+    <sys:String x:Key="Settings_TokenParameter">出力トークンのパラメーター</sys:String>
+    <sys:String x:Key="Settings_MaxOutputTokens">最大出力トークン数</sys:String>
+    <sys:String x:Key="Settings_ReasoningMode">推論オプション</sys:String>
+    <sys:String x:Key="Settings_ThinkingBudget">思考トークンの予算</sys:String>
     <sys:String x:Key="Settings_AzureEndpoint">Azure Endpoint</sys:String>
     <sys:String x:Key="Settings_AzureApiVersion">API バージョン</sys:String>
     <sys:String x:Key="Settings_CustomEndpoint">カスタム Endpoint</sys:String>

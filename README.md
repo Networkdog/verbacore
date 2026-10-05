@@ -118,7 +118,14 @@ That's it. The overlay fades in, the AI streams its answer, and the overlay fade
 | 🅰️ **CapsLock Hold** *(EnsoMode)* | Hold → type with native IME support → release to look up. Big, focused overlay. |
 | 🅰️ **CapsLock Tap** *(PersistentMode)* | Quick-tap (<0.5s) opens a persistent input box with full IME support. |
 | 🔥 **Global Hotkey** | `Ctrl+Alt+V` (customizable) from anywhere. |
-| 🖱️ **Cursor Text Grab** | Selected text under the cursor is auto-captured via UIA3 — works in Chromium / Electron / Office. |
+| 🖱️ **Cursor Text Grab** | Capture the foreground app's selection without the clipboard using UIA, native Office APIs, and IAccessible2. VS Code may require accessibility support to be On. |
+
+Selection support depends on the source application. Word and Excel have native
+document-window readers; PowerPoint text and classic Outlook's Word editor also
+have native-object paths. For VS Code, set **Editor: Accessibility Support** to
+**On** (`"editor.accessibilitySupport": "on"`). VerbaCore never changes that setting
+automatically. See [selection compatibility and verified limits](docs/selected-text-compatibility.md)
+for tested apps, unsupported surfaces, and regression commands.
 
 ### Keyboard-first by design
 
@@ -142,7 +149,7 @@ That's it. The overlay fades in, the AI streams its answer, and the overlay fade
 - **🖋️ Typography system** — UI Font, Content Font, and Code Font defined once and shared everywhere.
 - **📊 Rich Markdown rendering** — headings, code blocks, blockquotes, lists, tables — all theme-aware.
 - **📋 Searchable history** — last 200 lookups, copyable, deletable, re-queryable.
-- **🧠 Reasoning models supported** — auto-detects o1, o3, o4-mini, GPT-5.x and GPT-6.x, omitting `temperature` to use the model's default.
+- **🧠 Model-default requests** — no model-name guessing or fixed `temperature`; explicit protocol, reasoning, role, and token options for Foundry and other providers.
 - **🚀 Start with Windows** — opt-in, registry-based, instant.
 - **🖥️ Per-Monitor V2 DPI** — crisp on high-DPI laptops *and* mixed-DPI monitor setups.
 - **🔒 Single-instance Mutex** — never two copies of the hook fighting.
@@ -191,10 +198,11 @@ Engineered to be **invisible until you need it**:
 |---|---|---|
 | **OpenAI** | Bearer token | Default. GPT-4o, GPT-4o-mini, o1, o3, o4-mini, GPT-5.x |
 | **Azure OpenAI** | `api-key` header | Endpoint + Deployment Name + API Version |
+| **Microsoft Foundry** | `api-key` or `x-api-key`, by protocol | Resource endpoint + deployment name; Chat Completions or Anthropic Messages |
 | **Anthropic** | `x-api-key` | Native Claude API with `content_block_delta` SSE |
 | **Google Gemini** | Bearer token | Via OpenAI-compatible `generativelanguage.googleapis.com` |
 | **OpenRouter** | Bearer token | 100+ models behind a single key |
-| **Custom** | Bearer token | Any OpenAI-compatible endpoint |
+| **Custom** | Bearer token or `x-api-key`, by protocol | Chat Completions or Anthropic Messages endpoint |
 
 ### Run it fully local
 
@@ -214,9 +222,12 @@ Open **Settings** by double-clicking the tray icon, or right-click → **⚙ Set
 
 | Setting | Default | Notes |
 |---|---|---|
-| Provider | OpenAI | OpenAI · Azure · Anthropic · Gemini · OpenRouter · Custom |
+| Provider | OpenAI | OpenAI · Azure OpenAI · Microsoft Foundry · Anthropic · Gemini · OpenRouter · Custom |
 | Model | `gpt-4o-mini` | Cost-effective; switch to `gpt-4o` or Claude for higher quality |
-| Reasoning Effort | `none` | For o1 / o3 / GPT-5: `none` · `minimal` · `low` · `medium` · `high` · `xhigh` |
+| API protocol | Chat Completions | Select Anthropic Messages for Claude through Foundry or a compatible custom endpoint |
+| Reasoning options | Model defaults | Advanced: explicit `reasoning_effort`, `thinking`, or Claude adaptive/budgeted thinking; verify model/version support |
+| Output token parameter | Model defaults | Chat: omit, `max_tokens`, or `max_completion_tokens`; Messages requires `max_tokens` (8192 by default) |
+| Instruction role | `system` | Advanced Chat Completions choice; independent of reasoning settings |
 | Global Hotkey | `Ctrl+Alt+V` | Anything (e.g., `Shift+F12`, `Win+Z`) |
 | Theme | System | Dark / Light / System |
 | Popup Position | Center | 9-point grid: corners, edges, center |
@@ -230,6 +241,18 @@ Switch the provider to **Azure OpenAI** and fill in:
 - **Endpoint** — e.g. `https://your-resource.openai.azure.com`
 - **Deployment Name** — your model deployment name *(reuses the Model field)*
 - **API Version** — default `2024-10-21`
+
+### Microsoft Foundry
+
+Choose **Microsoft Foundry**, enter your resource endpoint (for example,
+`https://your-resource.services.ai.azure.com`), resource API key, and deployment name.
+Select **OpenAI Chat Completions** for compatible GPT/DeepSeek/Kimi deployments or
+**Anthropic Messages** for Claude. Leave advanced options at **Model defaults** unless
+the deployed model's documentation requires an override. Model defaults do not mean
+reasoning is disabled. Entra ID-only deployments are not supported by this API-key client.
+
+See [Foundry API research and compatibility design](docs/foundry-api-compatibility.md)
+for protocol differences, parameter constraints, migration behavior, and limitations.
 
 ---
 
@@ -249,9 +272,33 @@ dotnet run --project src/VerbaCore/VerbaCore.csproj
 dotnet run --project tests/VerbaCore.PopupTests/VerbaCore.PopupTests.csproj -c Release -- --api-requests
 ```
 
-Checks serialized non-streaming and streaming requests, including GPT-6 temperature
-omission and existing model/reasoning settings, using a fake HTTP handler. No network,
-API key, keyboard hooks, or interactive desktop is needed.
+Checks all provider protocols, model-default requests, explicit options, SSE errors,
+incomplete responses, cancellation, settings serialization, and cache boundaries using
+fake HTTP handlers. No network, API key, keyboard hooks, or interactive desktop is needed.
+
+### Settings UI regression checks
+
+```powershell
+dotnet run --project tests/VerbaCore.PopupTests/VerbaCore.PopupTests.csproj -c Release -- --settings
+```
+
+Renders the real settings control in an offscreen FluentWindow for four languages and
+two widths, checks option bindings, arbitrary deployment names, and invalid-save
+rejection, and writes temporary PNGs. Does not write user settings or call AI services.
+
+### Quick-tap focus regression
+
+```powershell
+dotnet run --project tests/VerbaCore.PopupTests/VerbaCore.PopupTests.csproj -c Release -- --focus
+```
+
+Requires an unlocked interactive desktop. The isolated probe switches between a
+separate foreground window and the real popup, verifies native/WPF keyboard focus,
+and types a test digit without mouse clicks. It also tests delayed input readiness,
+stale focus requests, cancellation on hide, and the guarded left-Alt recovery pair.
+Windows foreground-lock policy can vary; the probe checks actual focus and key
+delivery rather than assuming a lock request guarantees activation denial.
+No user settings, history, or AI requests are written.
 
 ### Popup regression checks
 
@@ -319,10 +366,10 @@ Output → `installer-output/VerbaCore-Setup-x.x.x.exe`.
 | UI | WPF + [WPF-UI 3.x](https://github.com/lepoco/wpfui) (Mica) — settings · raw WPF — overlay |
 | Architecture | MVVM via [CommunityToolkit.Mvvm](https://github.com/CommunityToolkit/dotnet) |
 | DI | `Microsoft.Extensions.DependencyInjection` |
-| AI | `HttpClient` + SSE streaming + `Utf8JsonReader` (6 providers) |
+| AI | `HttpClient` + SSE streaming + `Utf8JsonReader` (7 providers; Chat Completions / Messages) |
 | Markdown | [Markdig.Wpf](https://github.com/Kryptos-FR/markdig.wpf) |
 | Hotkeys | [NHotkey.Wpf](https://github.com/thomaslevesque/NHotkey) |
-| Text grab | COM UIA3 — Chromium / Electron compatible |
+| Text grab | COM UIA3 + MSAA/IAccessible2 + Office native object model; clipboard-free |
 | DPI | PerMonitorV2 via `ApplicationHighDpiMode` |
 | Persistence | `System.Text.Json` source-gen + Windows DPAPI |
 | Installer | [Inno Setup 6](https://jrsoftware.org/isinfo.php) |
@@ -342,12 +389,14 @@ src/VerbaCore/
 ├── app.manifest               # PerMonitorV2 DPI awareness
 ├── Services/
 │   ├── CapsLockService.cs     # Low-level keyboard hook (WH_KEYBOARD_LL)
-│   ├── OpenAiService.cs       # 6-provider SSE streaming + Utf8JsonReader
+│   ├── OpenAiService.cs       # 7-provider protocol-aware requests + SSE parsing
 │   ├── PromptBuilder.cs       # Mode-specific prompts + AutoMode selection
 │   ├── SettingsService.cs     # JSON + DPAPI (source-generated)
 │   ├── HistoryService.cs      # 200-item history + debounced save
 │   ├── HotkeyService.cs       # NHotkey global hotkey lifecycle
-│   └── CursorTextService.cs   # COM UIA3 selected-text extraction
+│   ├── CursorTextService.cs   # Captured-window selected text, MTA worker and cancellation
+│   ├── OfficeSelectionReader.cs # Native Office document/cell/text selections
+│   └── AccessibleSelectionReader.cs # MSAA/IAccessible2 selected ranges
 ├── Models/
 │   ├── AppSettings.cs         # Settings + enums
 │   ├── AppJsonContext.cs      # System.Text.Json source-gen contexts
@@ -358,11 +407,16 @@ src/VerbaCore/
 └── Helpers/
     ├── NativeMethods.cs       # Win32 P/Invoke + CachedModuleHandle
     ├── UIA3Interop.cs         # COM UIA3 interop definitions
+    ├── SelectionInterop.cs    # Window/focus capture, native OM and IAccessible2 interop
     └── Converters.cs          # XAML value converters
 
   tests/VerbaCore.PopupTests/
   ├── VerbaCore.PopupTests.csproj # Standalone Windows popup regression harness
-  └── Program.cs                 # Isolated foreground, idle, and working-set tests
+  └── Program.cs                 # Popup, API contract, settings UI, and cache regression checks
+
+  docs/
+  ├── foundry-api-compatibility.md # API research, settings, and compatibility boundaries
+  └── selected-text-compatibility.md # Clipboard-free selection support and validation
 ```
 
 </details>

@@ -20,9 +20,7 @@
 응답 시간이 초과되었습니다. 다시 시도해주세요.</sys:String>
     <sys:String x:Key="Overlay_ErrorMarkdown">## ❌ 오류
 
-{0}
-
-API Key와 설정을 확인해주세요.</sys:String>
+{0}</sys:String>
 
     <!-- Settings Window -->
     <sys:String x:Key="Settings_Title">VerbaCore 설정</sys:String>
@@ -35,9 +33,17 @@ API Key와 설정을 확인해주세요.</sys:String>
     <sys:String x:Key="Settings_Model">모델</sys:String>
     <sys:String x:Key="Settings_ModelAzure">모델 (Deployment Name)</sys:String>
     <sys:String x:Key="Settings_ModelHint">목록에서 선택하거나 직접 입력할 수 있습니다</sys:String>
-    <sys:String x:Key="Settings_ModelAzureHint">Azure OpenAI의 배포 이름을 입력하세요</sys:String>
+    <sys:String x:Key="Settings_ModelAzureHint">Azure에 배포한 이름</sys:String>
     <sys:String x:Key="Settings_ReasoningEffort">Reasoning Effort</sys:String>
-    <sys:String x:Key="Settings_ReasoningEffortHint">GPT-5, o1, o3 등 reasoning 모델에서 사고 수준 조절</sys:String>
+    <sys:String x:Key="Settings_ReasoningEffortHint">지원하는 값은 모델과 버전에 따라 다릅니다.</sys:String>
+    <sys:String x:Key="Settings_ApiProtocol">API 형식</sys:String>
+    <sys:String x:Key="Settings_RequestOptions">고급 요청 옵션</sys:String>
+    <sys:String x:Key="Settings_ModelDefaults">모델 기본값</sys:String>
+    <sys:String x:Key="Settings_InstructionRole">지침 메시지 역할</sys:String>
+    <sys:String x:Key="Settings_TokenParameter">출력 토큰 제한 방식</sys:String>
+    <sys:String x:Key="Settings_MaxOutputTokens">최대 출력 토큰</sys:String>
+    <sys:String x:Key="Settings_ReasoningMode">추론 옵션 방식</sys:String>
+    <sys:String x:Key="Settings_ThinkingBudget">추론 토큰 예산</sys:String>
     <sys:String x:Key="Settings_AzureEndpoint">Azure Endpoint</sys:String>
     <sys:String x:Key="Settings_AzureApiVersion">API 버전</sys:String>
     <sys:String x:Key="Settings_CustomEndpoint">Custom Endpoint</sys:String>

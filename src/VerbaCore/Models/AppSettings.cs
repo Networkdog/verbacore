@@ -7,6 +7,12 @@ public sealed class AppSettings
     public string ApiKeyProtected { get; set; } = string.Empty;
     public string Model { get; set; } = "gpt-4o-mini";
     public string ReasoningEffort { get; set; } = "none";
+    public InferenceProtocol Protocol { get; set; } = InferenceProtocol.ChatCompletions;
+    public ReasoningMode? ReasoningMode { get; set; }
+    public InstructionRole InstructionRole { get; set; } = InstructionRole.System;
+    public OutputTokenParameter TokenLimitParameter { get; set; } = OutputTokenParameter.ModelDefault;
+    public int MaxOutputTokens { get; set; } = 8192;
+    public int ThinkingBudgetTokens { get; set; } = 4096;
 
     // Azure OpenAI specific
     public string AzureEndpoint { get; set; } = string.Empty;
@@ -43,7 +49,38 @@ public enum ApiProvider
     Anthropic,
     Google,
     OpenRouter,
-    Custom
+    Custom,
+    Foundry
+}
+
+public enum InferenceProtocol
+{
+    ChatCompletions,
+    AnthropicMessages
+}
+
+public enum ReasoningMode
+{
+    ModelDefault,
+    OpenAiEffort,
+    ThinkingEnabled,
+    ThinkingDisabled,
+    AnthropicAdaptive,
+    AnthropicBudgeted
+}
+
+public enum InstructionRole
+{
+    System,
+    Developer,
+    User
+}
+
+public enum OutputTokenParameter
+{
+    ModelDefault,
+    MaxCompletionTokens,
+    MaxTokens
 }
 
 public enum OverlayPosition

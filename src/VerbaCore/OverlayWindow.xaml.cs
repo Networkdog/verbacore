@@ -46,6 +46,7 @@ public partial class OverlayWindow : Window
     private bool _holdInputMode;
     private bool _updatingInputText;
     private long _inputGesture;
+    private CancellationTokenSource? _quickTapFocusCts;
     /// <summary>Whether the overlay is currently visible.</summary>
     private bool _isShown;
     /// <summary>Set when CapsLock down opens a fresh overlay, cleared on release.</summary>
@@ -54,10 +55,11 @@ public partial class OverlayWindow : Window
     private string? _grabbedSelectedText;
     /// <summary>In-flight UIA selection grab for the current overlay session.</summary>
     private Task<string?>? _selectedTextTask;
+    private CancellationTokenSource? _selectionCts;
     /// <summary>Incremented per overlay session so a late UIA result can be discarded.</summary>
     private int _selectedTextSession;
     /// <summary>Longest we wait for the UIA grab before showing/looking up without it.</summary>
-    private const int SelectionGrabTimeoutMs = 800;
+    private const int SelectionGrabTimeoutMs = CursorTextService.SelectionTimeoutMs;
     /// <summary>True while an API lookup is actively streaming.</summary>
     private bool _isLookupInProgress;
     /// <summary>The most recent input that was looked up, so Tab can re-run with a new mode.</summary>
@@ -282,6 +284,7 @@ public partial class OverlayWindow : Window
             // If overlay is already showing, mark that we did NOT just open it
             // (so quick-tap release will close it)
             if (_isClosing) return;
+            CancelQuickTapFocus();
             if (_isShown)
             {
                 _justOpened = false;
@@ -293,9 +296,11 @@ public partial class OverlayWindow : Window
             _cts?.Cancel();
             _autoHideTimer.Stop();
 
-            var session = ++_selectedTextSession;
+            CancelSelection();
+            var session = _selectedTextSession;
             _grabbedSelectedText = null;
-            var grabTask = _cursorTextService.GetSelectedTextAsync(foregroundWindow, CancellationToken.None);
+            _selectionCts = new CancellationTokenSource();
+            var grabTask = _cursorTextService.GetSelectedTextAsync(foregroundWindow, _selectionCts.Token);
             _selectedTextTask = grabTask;
 
             if (_inputPrepared)
@@ -394,6 +399,16 @@ public partial class OverlayWindow : Window
         }
     }
 
+    private void CancelSelection()
+    {
+        _selectedTextSession++;
+        _selectionCts?.Cancel();
+        _selectionCts?.Dispose();
+        _selectionCts = null;
+        _selectedTextTask = null;
+        _grabbedSelectedText = null;
+    }
+
     /// <summary>Bounded wait so a slow or unresponsive app can't stall the overlay.</summary>
     private static async Task<string?> AwaitSelectionAsync(Task<string?> grabTask)
     {
@@ -426,6 +441,7 @@ public partial class OverlayWindow : Window
 
     private async Task HandleQuickTapReleasedAsync(long gesture, CancellationToken ct)
     {
+        if (_isClosing || gesture != Volatile.Read(ref _inputGesture)) return;
         _holdInputMode = false;
         if (_isShown && !_justOpened)
         {
@@ -463,15 +479,7 @@ public partial class OverlayWindow : Window
         StatusLabel.Text = Loc("Overlay_StatusInputPrompt");
         SetIgnoreCacheButtonVisible(false);
 
-        // Focus the TextBox for IME input.
-        ForceActivate();
-        await Dispatcher.InvokeAsync(() =>
-        {
-            if (_isClosing || !_isShown || gesture != Volatile.Read(ref _inputGesture)) return;
-            ForceActivate();
-            InputTextBox.Focus();
-            System.Windows.Input.Keyboard.Focus(InputTextBox);
-        }, DispatcherPriority.Input, ct);
+        await EnsureQuickTapFocusAsync(gesture, ct);
         if (_isClosing || !_isShown || gesture != Volatile.Read(ref _inputGesture)) return;
 
         // The selection grab started at CapsLock-down; auto-run it once it lands.
@@ -764,8 +772,7 @@ public partial class OverlayWindow : Window
 
         // Cache lookup — short-circuit before consuming LLM tokens
         var cacheKey = LookupCacheService.MakeKey(
-            _settingsService.Current.Provider.ToString(),
-            _settingsService.Current.Model,
+            _settingsService.Current,
             _currentMode, src, tgt, input);
         if (_settingsService.Current.EnableLookupCache && !bypassCache && _cacheService.TryGet(cacheKey, out var cachedResponse))
         {
@@ -925,6 +932,59 @@ public partial class OverlayWindow : Window
         Activate();
     }
 
+    private void CancelQuickTapFocus()
+    {
+        var pending = _quickTapFocusCts;
+        _quickTapFocusCts = null;
+        pending?.Cancel();
+    }
+
+    private bool CanFocusQuickTap(long gesture) => !_isClosing && _isShown && _persistentMode
+        && InputTextBox.IsVisible && ResultViewer.Visibility != Visibility.Visible
+        && gesture == Volatile.Read(ref _inputGesture);
+
+    private async Task EnsureQuickTapFocusAsync(long gesture, CancellationToken ct)
+    {
+        if (!CanFocusQuickTap(gesture)) return;
+        CancelQuickTapFocus();
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        _quickTapFocusCts = cancellation;
+        var hwnd = new WindowInteropHelper(this).Handle;
+        var origin = _capsLockService.ForegroundWindowAtPress;
+        if (origin == IntPtr.Zero) origin = NativeMethods.GetForegroundWindow();
+        try
+        {
+            for (var attempt = 0; attempt < 6; attempt++)
+            {
+                if (cancellation.IsCancellationRequested || !CanFocusQuickTap(gesture)) return;
+                var foreground = NativeMethods.GetForegroundWindow();
+                if (foreground != IntPtr.Zero && foreground != hwnd && foreground != origin) return;
+                if (!NativeMethods.IsInputDesktopCurrent()) return;
+
+                if (foreground != hwnd) Activate();
+                if (NativeMethods.GetForegroundWindow() == hwnd)
+                {
+                    NativeMethods.SetFocus(hwnd);
+                    InputTextBox.Focus();
+                    System.Windows.Input.Keyboard.Focus(InputTextBox);
+                    if (NativeMethods.GetFocus() == hwnd && InputTextBox.IsKeyboardFocused) return;
+                }
+                else if (attempt == 1 && foreground != IntPtr.Zero && NativeMethods.TryUnlockForegroundForQuickTap())
+                {
+                    NativeMethods.SetForegroundWindow(hwnd);
+                }
+
+                await Task.Delay(40, cancellation.Token);
+                await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Loaded, cancellation.Token);
+            }
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
+        finally
+        {
+            if (ReferenceEquals(_quickTapFocusCts, cancellation)) _quickTapFocusCts = null;
+        }
+    }
+
     /// <summary>
     /// Realizes the HWND and lays out both input modes without activating the window.
     /// </summary>
@@ -1061,6 +1121,8 @@ public partial class OverlayWindow : Window
 
     public void HideOverlay()
     {
+        CancelQuickTapFocus();
+        CancelSelection();
         if (!_isShown) return;
 
         _autoHideTimer.Stop();
@@ -1126,6 +1188,8 @@ public partial class OverlayWindow : Window
     /// </summary>
     public void CloseForShutdown()
     {
+        CancelQuickTapFocus();
+        CancelSelection();
         _isClosing = true;
         _isShown = false;
         _capsLockService.TextInputWindow = IntPtr.Zero;

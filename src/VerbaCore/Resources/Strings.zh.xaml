@@ -20,9 +20,7 @@
 请求已超时，请重试。</sys:String>
     <sys:String x:Key="Overlay_ErrorMarkdown">## ❌ 错误
 
-{0}
-
-请检查 API Key 和设置。</sys:String>
+{0}</sys:String>
 
     <!-- Settings Window -->
     <sys:String x:Key="Settings_Title">VerbaCore 设置</sys:String>
@@ -35,9 +33,17 @@
     <sys:String x:Key="Settings_Model">模型</sys:String>
     <sys:String x:Key="Settings_ModelAzure">模型 (Deployment Name)</sys:String>
     <sys:String x:Key="Settings_ModelHint">可从列表中选择或直接输入</sys:String>
-    <sys:String x:Key="Settings_ModelAzureHint">请输入 Azure OpenAI 的部署名称</sys:String>
+    <sys:String x:Key="Settings_ModelAzureHint">Azure 部署名称</sys:String>
     <sys:String x:Key="Settings_ReasoningEffort">Reasoning Effort</sys:String>
-    <sys:String x:Key="Settings_ReasoningEffortHint">调整 GPT-5、o1、o3 等推理模型的思考强度</sys:String>
+    <sys:String x:Key="Settings_ReasoningEffortHint">支持的值取决于模型和版本。</sys:String>
+    <sys:String x:Key="Settings_ApiProtocol">API 协议</sys:String>
+    <sys:String x:Key="Settings_RequestOptions">高级请求选项</sys:String>
+    <sys:String x:Key="Settings_ModelDefaults">模型默认值</sys:String>
+    <sys:String x:Key="Settings_InstructionRole">指令消息角色</sys:String>
+    <sys:String x:Key="Settings_TokenParameter">输出令牌参数</sys:String>
+    <sys:String x:Key="Settings_MaxOutputTokens">最大输出令牌数</sys:String>
+    <sys:String x:Key="Settings_ReasoningMode">推理选项</sys:String>
+    <sys:String x:Key="Settings_ThinkingBudget">思考令牌预算</sys:String>
     <sys:String x:Key="Settings_AzureEndpoint">Azure Endpoint</sys:String>
     <sys:String x:Key="Settings_AzureApiVersion">API 版本</sys:String>
     <sys:String x:Key="Settings_CustomEndpoint">自定义 Endpoint</sys:String>

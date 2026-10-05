@@ -20,9 +20,7 @@
 The request timed out. Please try again.</sys:String>
     <sys:String x:Key="Overlay_ErrorMarkdown">## ❌ Error
 
-{0}
-
-Please check your API Key and settings.</sys:String>
+{0}</sys:String>
 
     <!-- Settings Window -->
     <sys:String x:Key="Settings_Title">VerbaCore Settings</sys:String>
@@ -35,9 +33,17 @@ Please check your API Key and settings.</sys:String>
     <sys:String x:Key="Settings_Model">Model</sys:String>
     <sys:String x:Key="Settings_ModelAzure">Model (Deployment Name)</sys:String>
     <sys:String x:Key="Settings_ModelHint">Select from list or type directly</sys:String>
-    <sys:String x:Key="Settings_ModelAzureHint">Enter your Azure OpenAI deployment name</sys:String>
+    <sys:String x:Key="Settings_ModelAzureHint">Azure deployment name</sys:String>
     <sys:String x:Key="Settings_ReasoningEffort">Reasoning Effort</sys:String>
-    <sys:String x:Key="Settings_ReasoningEffortHint">Adjust reasoning level for GPT-5, o1, o3 etc.</sys:String>
+    <sys:String x:Key="Settings_ReasoningEffortHint">Supported values depend on the model and version.</sys:String>
+    <sys:String x:Key="Settings_ApiProtocol">API protocol</sys:String>
+    <sys:String x:Key="Settings_RequestOptions">Advanced request options</sys:String>
+    <sys:String x:Key="Settings_ModelDefaults">Model defaults</sys:String>
+    <sys:String x:Key="Settings_InstructionRole">Instruction message role</sys:String>
+    <sys:String x:Key="Settings_TokenParameter">Output token parameter</sys:String>
+    <sys:String x:Key="Settings_MaxOutputTokens">Maximum output tokens</sys:String>
+    <sys:String x:Key="Settings_ReasoningMode">Reasoning options</sys:String>
+    <sys:String x:Key="Settings_ThinkingBudget">Thinking token budget</sys:String>
     <sys:String x:Key="Settings_AzureEndpoint">Azure Endpoint</sys:String>
     <sys:String x:Key="Settings_AzureApiVersion">API Version</sys:String>
     <sys:String x:Key="Settings_CustomEndpoint">Custom Endpoint</sys:String>

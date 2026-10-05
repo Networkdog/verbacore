@@ -37,4 +37,5 @@ internal partial class UpdateJsonContext : JsonSerializerContext;
     WriteIndented = false,
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
 [JsonSerializable(typeof(LookupCache))]
+[JsonSerializable(typeof(string[]))]
 internal partial class CacheJsonContext : JsonSerializerContext;

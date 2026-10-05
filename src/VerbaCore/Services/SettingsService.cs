@@ -59,12 +59,23 @@ public sealed class SettingsService
         }
 
         // Don't persist the plaintext key
-        var toSave = new AppSettings
+        var toSave = CreateSaveSnapshot();
+        var json = JsonSerializer.Serialize(toSave, SettingsJsonContext.Default.AppSettings);
+        await File.WriteAllTextAsync(SettingsPath, json);
+    }
+
+    private AppSettings CreateSaveSnapshot() => new()
         {
             Provider = _current.Provider,
             ApiKeyProtected = _current.ApiKeyProtected,
             Model = _current.Model,
             ReasoningEffort = _current.ReasoningEffort,
+            Protocol = _current.Protocol,
+            ReasoningMode = _current.ReasoningMode,
+            InstructionRole = _current.InstructionRole,
+            TokenLimitParameter = _current.TokenLimitParameter,
+            MaxOutputTokens = _current.MaxOutputTokens,
+            ThinkingBudgetTokens = _current.ThinkingBudgetTokens,
             AzureEndpoint = _current.AzureEndpoint,
             AzureApiVersion = _current.AzureApiVersion,
             CustomEndpoint = _current.CustomEndpoint,
@@ -78,10 +89,6 @@ public sealed class SettingsService
             PopupPosition = _current.PopupPosition,
             OverlaySize = _current.OverlaySize
         };
-
-        var json = JsonSerializer.Serialize(toSave, SettingsJsonContext.Default.AppSettings);
-        await File.WriteAllTextAsync(SettingsPath, json);
-    }
 
     private static string ProtectString(string plainText)
     {

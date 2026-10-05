@@ -12,6 +12,7 @@ public partial class SettingsViewModel : ObservableObject
     private readonly SettingsService _settingsService;
     private readonly LocalizationService _localizationService;
     private readonly LookupCacheService _cacheService;
+    private bool _loadingSettings = true;
 
     private static string Loc(string key) =>
         Application.Current.TryFindResource(key) as string ?? key;
@@ -66,6 +67,7 @@ public partial class SettingsViewModel : ObservableObject
             "qwen/qwen3-235b-a22b"
         ],
         ["Azure OpenAI"] = [],
+        ["Microsoft Foundry"] = [],
         ["Custom"] = []
     };
 
@@ -80,6 +82,24 @@ public partial class SettingsViewModel : ObservableObject
 
     [ObservableProperty]
     private string _reasoningEffort = "none";
+
+    [ObservableProperty]
+    private InferenceProtocol _protocol;
+
+    [ObservableProperty]
+    private ReasoningMode _selectedReasoningMode;
+
+    [ObservableProperty]
+    private InstructionRole _selectedInstructionRole;
+
+    [ObservableProperty]
+    private OutputTokenParameter _tokenLimitParameter;
+
+    [ObservableProperty]
+    private int _maxOutputTokens = 8192;
+
+    [ObservableProperty]
+    private int _thinkingBudgetTokens = 4096;
 
     [ObservableProperty]
     private string _azureEndpoint = string.Empty;
@@ -146,8 +166,58 @@ public partial class SettingsViewModel : ObservableObject
     public ObservableCollection<string> AvailableModels { get; } = new();
     public ObservableCollection<string> AvailablePositions { get; } = new();
     public ObservableCollection<string> AvailableSizes { get; } = new();
-    public string[] AvailableProviders { get; } = ["OpenAI", "Anthropic", "Google Gemini", "OpenRouter", "Azure OpenAI", "Custom"];
-    public string[] AvailableReasoningEfforts { get; } = ["none", "minimal", "low", "medium", "high", "xhigh"];
+    public string[] AvailableProviders { get; } = ["OpenAI", "Anthropic", "Google Gemini", "OpenRouter", "Azure OpenAI", "Microsoft Foundry", "Custom"];
+    public IReadOnlyDictionary<InferenceProtocol, string> AvailableProtocols { get; } = new Dictionary<InferenceProtocol, string>
+    {
+        [InferenceProtocol.ChatCompletions] = "OpenAI Chat Completions",
+        [InferenceProtocol.AnthropicMessages] = "Anthropic Messages"
+    };
+    public IReadOnlyDictionary<InstructionRole, string> AvailableInstructionRoles { get; } = new Dictionary<InstructionRole, string>
+    {
+        [InstructionRole.System] = "system",
+        [InstructionRole.Developer] = "developer",
+        [InstructionRole.User] = "user"
+    };
+    public IReadOnlyDictionary<OutputTokenParameter, string> AvailableTokenParameters => new Dictionary<OutputTokenParameter, string>
+    {
+        [OutputTokenParameter.ModelDefault] = Loc("Settings_ModelDefaults"),
+        [OutputTokenParameter.MaxCompletionTokens] = "max_completion_tokens",
+        [OutputTokenParameter.MaxTokens] = "max_tokens"
+    };
+    public IReadOnlyDictionary<ReasoningMode, string> AvailableReasoningModes => IsMessages
+        ? new Dictionary<ReasoningMode, string>
+        {
+            [ReasoningMode.ModelDefault] = Loc("Settings_ModelDefaults"),
+            [ReasoningMode.ThinkingDisabled] = "thinking: disabled",
+            [ReasoningMode.AnthropicAdaptive] = "Claude: adaptive thinking",
+            [ReasoningMode.AnthropicBudgeted] = "Claude: budgeted thinking"
+        }
+        : new Dictionary<ReasoningMode, string>
+        {
+            [ReasoningMode.ModelDefault] = Loc("Settings_ModelDefaults"),
+            [ReasoningMode.OpenAiEffort] = "reasoning_effort",
+            [ReasoningMode.ThinkingEnabled] = "thinking: enabled",
+            [ReasoningMode.ThinkingDisabled] = "thinking: disabled"
+        };
+    public IReadOnlyDictionary<string, string> AvailableReasoningEfforts
+    {
+        get
+        {
+            var values = new Dictionary<string, string> { ["default"] = Loc("Settings_ModelDefaults") };
+            foreach (var value in SelectedReasoningMode == ReasoningMode.OpenAiEffort
+                ? new[] { "none", "minimal", "low", "medium", "high", "xhigh", "max" }
+                : new[] { "low", "medium", "high", "xhigh", "max" }) values.Add(value, value);
+            return values;
+        }
+    }
+    public bool IsLegacyAzure => SelectedProvider == "Azure OpenAI";
+    public bool IsFoundry => SelectedProvider == "Microsoft Foundry";
+    public bool ShowProtocol => IsFoundry || IsCustom;
+    public bool IsMessages => SelectedProvider == "Anthropic" || (ShowProtocol && Protocol == InferenceProtocol.AnthropicMessages);
+    public bool ShowReasoningEffort => SelectedReasoningMode is ReasoningMode.OpenAiEffort or ReasoningMode.AnthropicAdaptive;
+    public bool ShowThinkingBudget => SelectedReasoningMode == ReasoningMode.AnthropicBudgeted;
+    public bool ShowTokenLimit => IsMessages || TokenLimitParameter != OutputTokenParameter.ModelDefault;
+    public string AzureEndpointPlaceholder => IsFoundry ? "https://your-resource.services.ai.azure.com" : "https://your-resource.openai.azure.com";
     public string[] AvailableThemes { get; } = ["System", "Light", "Dark"];
     public string[] AvailableUiLanguages { get; } = ["한국어", "English", "中文", "日本語"];
     public string[] AvailableLanguages { get; } =
@@ -165,11 +235,13 @@ public partial class SettingsViewModel : ObservableObject
         _cacheService = cacheService;
         _localizationService.LanguageChanged += OnLanguageChanged;
         LoadFromSettings();
+        _loadingSettings = false;
     }
 
     private void OnLanguageChanged()
     {
         RefreshLocalizedCollections();
+        RefreshApiOptions();
     }
 
     private void RefreshLocalizedCollections()
@@ -196,6 +268,7 @@ public partial class SettingsViewModel : ObservableObject
     private static string ProviderToString(ApiProvider p) => p switch
     {
         ApiProvider.AzureOpenAI => "Azure OpenAI",
+        ApiProvider.Foundry => "Microsoft Foundry",
         ApiProvider.Anthropic => "Anthropic",
         ApiProvider.Google => "Google Gemini",
         ApiProvider.OpenRouter => "OpenRouter",
@@ -206,6 +279,7 @@ public partial class SettingsViewModel : ObservableObject
     private static ApiProvider StringToProvider(string s) => s switch
     {
         "Azure OpenAI" => ApiProvider.AzureOpenAI,
+        "Microsoft Foundry" => ApiProvider.Foundry,
         "Anthropic" => ApiProvider.Anthropic,
         "Google Gemini" => ApiProvider.Google,
         "OpenRouter" => ApiProvider.OpenRouter,
@@ -217,11 +291,17 @@ public partial class SettingsViewModel : ObservableObject
     {
         var s = _settingsService.Current;
         SelectedProvider = ProviderToString(s.Provider);
-        IsAzure = s.Provider == ApiProvider.AzureOpenAI;
+        IsAzure = s.Provider is ApiProvider.AzureOpenAI or ApiProvider.Foundry;
         IsCustom = s.Provider == ApiProvider.Custom;
         ApiKey = s.ApiKey;
         SelectedModel = s.Model;
-        ReasoningEffort = s.ReasoningEffort;
+        Protocol = s.Protocol;
+        SelectedReasoningMode = OpenAiService.GetReasoningMode(s);
+        ReasoningEffort = SelectedReasoningMode == ReasoningMode.ModelDefault ? "default" : s.ReasoningEffort;
+        SelectedInstructionRole = s.InstructionRole;
+        TokenLimitParameter = s.TokenLimitParameter;
+        MaxOutputTokens = s.MaxOutputTokens;
+        ThinkingBudgetTokens = s.ThinkingBudgetTokens;
         AzureEndpoint = s.AzureEndpoint;
         AzureApiVersion = s.AzureApiVersion;
         CustomEndpoint = s.CustomEndpoint;
@@ -260,10 +340,59 @@ public partial class SettingsViewModel : ObservableObject
 
     partial void OnSelectedProviderChanged(string value)
     {
-        IsAzure = value == "Azure OpenAI";
+        IsAzure = value is "Azure OpenAI" or "Microsoft Foundry";
         IsCustom = value == "Custom";
         HasModelCatalog = ModelCatalog.TryGetValue(value, out var models) && models.Length > 0;
         UpdateAvailableModels();
+        if (!_loadingSettings)
+        {
+            SelectedModel = AvailableModels.FirstOrDefault() ?? string.Empty;
+            Protocol = InferenceProtocol.ChatCompletions;
+            ResetRequestOptions();
+        }
+        RefreshApiOptions();
+    }
+
+    partial void OnProtocolChanged(InferenceProtocol value)
+    {
+        if (!_loadingSettings) ResetRequestOptions();
+        RefreshApiOptions();
+    }
+
+    partial void OnSelectedModelChanged(string value)
+    {
+        if (!_loadingSettings) ResetRequestOptions();
+    }
+
+    partial void OnSelectedReasoningModeChanged(ReasoningMode value)
+    {
+        if (!_loadingSettings) ReasoningEffort = "default";
+        RefreshApiOptions();
+    }
+
+    partial void OnTokenLimitParameterChanged(OutputTokenParameter value) => OnPropertyChanged(nameof(ShowTokenLimit));
+
+    private void ResetRequestOptions()
+    {
+        SelectedReasoningMode = ReasoningMode.ModelDefault;
+        ReasoningEffort = "default";
+        SelectedInstructionRole = InstructionRole.System;
+        TokenLimitParameter = OutputTokenParameter.ModelDefault;
+    }
+
+    private void RefreshApiOptions()
+    {
+        OnPropertyChanged(nameof(IsLegacyAzure));
+        OnPropertyChanged(nameof(IsFoundry));
+        OnPropertyChanged(nameof(ShowProtocol));
+        OnPropertyChanged(nameof(IsMessages));
+        OnPropertyChanged(nameof(ShowReasoningEffort));
+        OnPropertyChanged(nameof(ShowThinkingBudget));
+        OnPropertyChanged(nameof(ShowTokenLimit));
+        OnPropertyChanged(nameof(AzureEndpointPlaceholder));
+        OnPropertyChanged(nameof(AvailableReasoningModes));
+        OnPropertyChanged(nameof(AvailableReasoningEfforts));
+        OnPropertyChanged(nameof(AvailableTokenParameters));
     }
 
     private void UpdateAvailableModels()
@@ -273,26 +402,40 @@ public partial class SettingsViewModel : ObservableObject
         {
             foreach (var m in models) AvailableModels.Add(m);
         }
-        // Keep current model if it's in the list, or if it's a free-text entry (Azure/Custom)
-        if (AvailableModels.Count > 0 && !AvailableModels.Contains(SelectedModel))
-        {
-            SelectedModel = AvailableModels[0];
-        }
     }
 
     private CancellationTokenSource? _statusClearCts;
 
+    private void ApplyRequestSettings(AppSettings target)
+    {
+        target.Provider = StringToProvider(SelectedProvider);
+        target.ApiKey = ApiKey;
+        target.Model = SelectedModel;
+        target.ReasoningEffort = ReasoningEffort;
+        target.Protocol = Protocol;
+        target.ReasoningMode = SelectedReasoningMode;
+        target.InstructionRole = SelectedInstructionRole;
+        target.TokenLimitParameter = TokenLimitParameter;
+        target.MaxOutputTokens = MaxOutputTokens;
+        target.ThinkingBudgetTokens = ThinkingBudgetTokens;
+        target.AzureEndpoint = AzureEndpoint;
+        target.AzureApiVersion = AzureApiVersion;
+        target.CustomEndpoint = CustomEndpoint;
+    }
+
     [RelayCommand]
     private async Task SaveSettingsAsync()
     {
+        var candidate = new AppSettings();
+        ApplyRequestSettings(candidate);
+        try { OpenAiService.ValidateConfiguration(candidate); }
+        catch (InvalidOperationException exception)
+        {
+            StatusMessage = exception.Message;
+            return;
+        }
         var s = _settingsService.Current;
-        s.Provider = StringToProvider(SelectedProvider);
-        s.ApiKey = ApiKey;
-        s.Model = SelectedModel;
-        s.ReasoningEffort = ReasoningEffort;
-        s.AzureEndpoint = AzureEndpoint;
-        s.AzureApiVersion = AzureApiVersion;
-        s.CustomEndpoint = CustomEndpoint;
+        ApplyRequestSettings(s);
         s.StartWithWindows = StartWithWindows;
         s.GlobalHotkey = GlobalHotkey;
         s.NativeLanguage = NativeLanguage;

@@ -1,26 +1,27 @@
 using System.Collections.Concurrent;
 using System.Runtime.InteropServices;
+using System.Text;
 using VerbaCore.Helpers;
 
 namespace VerbaCore.Services;
 
 /// <summary>
-/// Extracts selected text from the focused application using COM-based UIA3.
-/// The managed System.Windows.Automation uses UIA2, which Chromium/Electron
-/// does not support for TextPattern. COM UIA3 is the API used by NVDA and FlaUI.
+/// Extracts selected text from a captured application window using UIA, Office, and IAccessible2.
 /// </summary>
 /// <remarks>
-/// All automation calls run on a dedicated STA thread. They are cross-process and can take
+/// All selection automation calls run on a dedicated MTA thread. They are cross-process and can take
 /// hundreds of milliseconds, which would blow past the 300 ms low-level keyboard hook
 /// timeout if executed on the hook or UI thread. The IUIAutomation object is created on
 /// that thread too, so calls stay in-apartment instead of marshalling back to the UI thread.
 /// </remarks>
 public sealed class CursorTextService : IDisposable
 {
+    public const int SelectionTimeoutMs = 2000;
     private readonly BlockingCollection<Action> _queue = new();
     private readonly Thread _worker;
     private IUIAutomation _uia = null!;
-    private long _requestSeq;
+    private CancellationTokenSource? _activeRequest;
+    private bool _disposed;
 
     public CursorTextService()
     {
@@ -29,17 +30,26 @@ public sealed class CursorTextService : IDisposable
             IsBackground = true,
             Name = "VerbaCore.Uia"
         };
-        _worker.SetApartmentState(ApartmentState.STA);
+        _worker.SetApartmentState(ApartmentState.MTA);
         _worker.Start();
     }
 
     private void WorkerMain()
     {
-        _uia = UIA3.CreateAutomation();
-        foreach (var work in _queue.GetConsumingEnumerable())
+        try
         {
-            try { work(); }
-            catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[CursorTextService] {ex}"); }
+            try { _uia = UIA3.CreateAutomation(); }
+            catch (COMException) { }
+            foreach (var work in _queue.GetConsumingEnumerable())
+            {
+                try { work(); }
+                catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[CursorTextService] {ex.GetType().Name}"); }
+            }
+        }
+        finally
+        {
+            if (_uia != null && Marshal.IsComObject(_uia)) Marshal.ReleaseComObject(_uia);
+            lock (_queue) _queue.Dispose();
         }
     }
 
@@ -48,27 +58,35 @@ public sealed class CursorTextService : IDisposable
     /// is the window captured before the overlay stole focus; pass <see cref="IntPtr.Zero"/> to
     /// resolve it at call time.
     /// </summary>
-    public Task<string?> GetSelectedTextAsync(IntPtr foregroundWindow, CancellationToken ct)
+    public async Task<string?> GetSelectedTextAsync(IntPtr foregroundWindow, CancellationToken ct)
     {
-        var seq = Interlocked.Increment(ref _requestSeq);
+        var target = SelectionTarget.Capture(foregroundWindow);
+        using var request = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        request.CancelAfter(SelectionTimeoutMs);
+        var token = request.Token;
         var tcs = new TaskCompletionSource<string?>(TaskCreationOptions.RunContinuationsAsynchronously);
-        try
+        using var registration = token.Register(() => tcs.TrySetResult(null));
+        lock (_queue)
         {
+            if (_disposed || token.IsCancellationRequested || !target.IsValid) return null;
+            _activeRequest?.Cancel();
+            _activeRequest = request;
             _queue.Add(() =>
             {
-                // Drop stale requests so rapid CapsLock presses don't queue up behind a
-                // slow lookup of a window the user has already moved on from.
-                if (ct.IsCancellationRequested || Interlocked.Read(ref _requestSeq) != seq)
-                    tcs.TrySetResult(null);
-                else
-                    tcs.TrySetResult(GetSelectedText(foregroundWindow));
-            }, ct);
+                string? text = null;
+                try
+                {
+                    if (!token.IsCancellationRequested) text = GetSelectedText(target, token);
+                }
+                finally { tcs.TrySetResult(token.IsCancellationRequested ? null : text); }
+            });
         }
-        catch (Exception)
+        try { return await tcs.Task.ConfigureAwait(false); }
+        finally
         {
-            tcs.TrySetResult(null);
+            lock (_queue)
+                if (ReferenceEquals(_activeRequest, request)) _activeRequest = null;
         }
-        return tcs.Task;
     }
 
     /// <summary>
@@ -77,95 +95,84 @@ public sealed class CursorTextService : IDisposable
     /// </summary>
     public void PreWarm()
     {
-        try
+        TryEnqueue(() =>
         {
-            _queue.Add(() =>
-            {
-                try { _ = _uia.GetFocusedElement(); }
-                catch (COMException) { }
-            });
-        }
-        catch (Exception) { /* queue already completed */ }
+            try { _ = _uia?.GetFocusedElement(); }
+            catch (COMException) { }
+        });
     }
 
-    /// <summary>
-    /// Gets the currently selected (highlighted) text from the focused application
-    /// using COM UIA3 TextPattern. Works with native apps, browsers, and Electron/Chromium.
-    /// Does not use the clipboard. Automation-thread only.
-    /// </summary>
-    private string? GetSelectedText(IntPtr foregroundWindow)
+    private string? GetSelectedText(SelectionTarget target, CancellationToken ct)
     {
         try
         {
-            // 1) Pre-warm the foreground app's accessibility tree.
-            //    For Electron/Chromium this triggers lazy a11y initialization
-            //    (the same mechanism NVDA uses). Without this call, Chromium
-            //    apps return null even though the user has text selected.
-            IUIAutomationElement? hwndRoot = null;
-            try
+            for (var attempt = 0; attempt < 4 && !ct.IsCancellationRequested && target.IsValid; attempt++)
             {
-                var fgHwnd = foregroundWindow != IntPtr.Zero
-                    ? foregroundWindow
-                    : NativeMethods.GetForegroundWindow();
-                if (fgHwnd != IntPtr.Zero)
-                    hwndRoot = _uia.ElementFromHandle(fgHwnd);
-            }
-            catch (COMException) { /* tolerate */ }
-
-            // 2) Fast path: focused element + its ancestors. This runs before the overlay
-            //    has taken focus in practice, since the grab is queued at CapsLock-down.
-            var text = TryFocusedAndAncestors();
-            if (text != null) return text;
-
-            // 3) Chromium often exposes TextPattern on a Document descendant of the window
-            //    root rather than an ancestor of the focused element. The captured handle
-            //    still points at the original app even once the overlay owns focus.
-            if (hwndRoot != null)
-            {
-                text = SearchDescendants(hwndRoot, depth: 0, maxDepth: 8, siblingBudget: 64);
+                var text = OfficeSelectionReader.TryRead(target, ct);
                 if (text != null) return text;
-            }
 
-            // 4) On the first activation Chromium builds the a11y tree async.
-            //    A single short retry catches that race without noticeable lag.
-            Thread.Sleep(60);
-            text = TryFocusedAndAncestors();
-            if (text != null) return text;
-            if (hwndRoot != null)
-            {
-                text = SearchDescendants(hwndRoot, depth: 0, maxDepth: 10, siblingBudget: 96);
+                text = TryReadFocusedUia(target, ct);
                 if (text != null) return text;
-            }
 
-            return null;
+                var remaining = 384;
+                foreach (var window in SelectionInterop.CandidateWindows(target)
+                             .OrderByDescending(window => SelectionInterop.ClassName(window).StartsWith("Chrome_RenderWidgetHostHWND", StringComparison.Ordinal)))
+                {
+                    if (ct.IsCancellationRequested) return null;
+                    if (_uia == null || remaining <= 0) break;
+                    if (window != target.Window && window != target.FocusWindow
+                        && !SelectionInterop.ClassName(window).StartsWith("Chrome_RenderWidgetHostHWND", StringComparison.Ordinal)) continue;
+                    try
+                    {
+                        var root = _uia.ElementFromHandle(window);
+                        if (root != null)
+                        {
+                            text = SearchDescendants(root, 0, ref remaining, ct);
+                            if (text != null) return text;
+                        }
+                    }
+                    catch (COMException) { }
+                }
+                text = AccessibleSelectionReader.TryRead(target, ct);
+                if (text != null) return text;
+                if (attempt < 3) Task.Delay(60, ct).GetAwaiter().GetResult();
+            }
         }
-        catch (COMException)
-        {
-            return null;
-        }
-        catch
-        {
-            return null;
-        }
+        catch (Exception exception) when (exception is COMException or InvalidOperationException
+            or OperationCanceledException or ArgumentException) { }
+        return null;
     }
 
-    private string? TryFocusedAndAncestors()
+    private string? TryReadFocusedUia(SelectionTarget target, CancellationToken ct)
+    {
+        if (_uia == null || ct.IsCancellationRequested) return null;
+        try
+        {
+            var root = _uia.ElementFromHandle(target.Window);
+            return root == null ? null : TryFocusedAndAncestors(root, ct);
+        }
+        catch (COMException) { return null; }
+    }
+
+    private string? TryFocusedAndAncestors(IUIAutomationElement root, CancellationToken ct)
     {
         try
         {
             var focused = _uia.GetFocusedElement();
             if (focused == null) return null;
 
-            var text = TryGetSelectionText(focused);
-            if (text != null) return text;
-
+            var ancestors = new List<IUIAutomationElement>();
             var walker = _uia.RawViewWalker;
-            var parent = walker.GetParentElement(focused);
-            for (var depth = 0; parent != null && depth < 8; depth++)
+            for (var element = focused; element != null && ancestors.Count < 48 && !ct.IsCancellationRequested; element = walker.GetParentElement(element))
             {
-                text = TryGetSelectionText(parent);
-                if (text != null) return text;
-                parent = walker.GetParentElement(parent);
+                ancestors.Add(element);
+                if (_uia.CompareElements(element, root) == 0) continue;
+                for (var index = ancestors.Count - 1; index >= 0; index--)
+                {
+                    var text = TryGetSelectionText(ancestors[index]);
+                    if (text != null) return text;
+                }
+                return null;
             }
             return null;
         }
@@ -173,28 +180,22 @@ public sealed class CursorTextService : IDisposable
         catch (InvalidOperationException) { return null; }
     }
 
-    /// <summary>
-    /// Bounded DFS over the UIA subtree looking for an element whose TextPattern
-    /// reports a non-empty selection. Used as a fallback for Chromium/Electron
-    /// where the document node isn't an ancestor of the focused element.
-    /// </summary>
-    private string? SearchDescendants(IUIAutomationElement element, int depth, int maxDepth, int siblingBudget)
+    private string? SearchDescendants(IUIAutomationElement element, int depth, ref int remaining, CancellationToken ct)
     {
+        if (ct.IsCancellationRequested || remaining-- <= 0) return null;
         try
         {
-            var t = TryGetSelectionText(element);
-            if (t != null) return t;
-            if (depth >= maxDepth) return null;
+            var text = TryGetSelectionText(element);
+            if (text != null) return text;
+            if (depth >= 32) return null;
 
             var walker = _uia.RawViewWalker;
             var child = walker.GetFirstChildElement(element);
-            var visited = 0;
-            while (child != null && visited < siblingBudget)
+            while (child != null && remaining > 0 && !ct.IsCancellationRequested)
             {
-                var r = SearchDescendants(child, depth + 1, maxDepth, siblingBudget);
-                if (r != null) return r;
+                text = SearchDescendants(child, depth + 1, ref remaining, ct);
+                if (text != null) return text;
                 child = walker.GetNextSiblingElement(child);
-                visited++;
             }
             return null;
         }
@@ -206,6 +207,7 @@ public sealed class CursorTextService : IDisposable
     {
         try
         {
+            if (element.GetCurrentPropertyValue(30019) is true) return null;
             var iid = typeof(IUIAutomationTextPattern).GUID;
             var ptr = element.GetCurrentPatternAs(UIA3.UIA_TextPatternId, ref iid);
             if (ptr == IntPtr.Zero) return null;
@@ -216,11 +218,16 @@ public sealed class CursorTextService : IDisposable
             var ranges = tp.GetSelection();
             if (ranges == null || ranges.Length == 0) return null;
 
-            var range = ranges.GetElement(0);
-            if (range == null) return null;
-
-            var text = range.GetText(2000)?.Trim();
-            return string.IsNullOrEmpty(text) ? null : text;
+            var result = new StringBuilder();
+            for (var index = 0; index < Math.Min(ranges.Length, 32) && result.Length < OfficeSelectionReader.MaxTextLength; index++)
+            {
+                var range = ranges.GetElement(index);
+                if (range == null || range.CompareEndpoints(0, range, 1) == 0) continue;
+                if (result.Length > 0) result.Append('\n');
+                var remaining = OfficeSelectionReader.MaxTextLength - result.Length;
+                if (remaining > 0) result.Append(range.GetText(remaining));
+            }
+            return OfficeSelectionReader.Normalize(result.ToString());
         }
         catch (COMException)
         {
@@ -234,6 +241,14 @@ public sealed class CursorTextService : IDisposable
 
     public string? GetTextUnderCursor()
     {
+        var result = new TaskCompletionSource<string?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        if (!TryEnqueue(() => result.TrySetResult(ReadTextUnderCursor()))) return null;
+        return result.Task.Wait(SelectionTimeoutMs) ? result.Task.Result : null;
+    }
+
+    private string? ReadTextUnderCursor()
+    {
+        if (_uia == null) return null;
         try
         {
             NativeMethods.GetCursorPos(out var point);
@@ -264,10 +279,24 @@ public sealed class CursorTextService : IDisposable
         }
     }
 
+    private bool TryEnqueue(Action work)
+    {
+        lock (_queue)
+        {
+            if (_disposed) return false;
+            _queue.Add(work);
+            return true;
+        }
+    }
+
     public void Dispose()
     {
-        _queue.CompleteAdding();
-        _worker.Join(TimeSpan.FromSeconds(2));
-        _queue.Dispose();
+        lock (_queue)
+        {
+            if (_disposed) return;
+            _disposed = true;
+            _activeRequest?.Cancel();
+            _queue.CompleteAdding();
+        }
     }
 }
